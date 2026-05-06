@@ -47,6 +47,9 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-900 px-4">
       <div className="w-full max-w-sm rounded-2xl bg-slate-800 p-8 shadow-xl">
+        <div className="mb-4 flex justify-center">
+          <img src="/app-icon.svg" alt="JAILU" className="h-20 w-20 rounded-2xl shadow-lg shadow-indigo-950" />
+        </div>
         <h1 className="mb-2 text-center text-3xl font-bold tracking-tight text-white">
           JAILU
         </h1>

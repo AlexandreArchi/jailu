@@ -52,8 +52,9 @@ export default function LibraryPage({ user }: LibraryPageProps) {
 
   if (myProfile === 'loading') {
     return (
-      <div className="flex h-screen items-center justify-center bg-slate-950">
-        <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-700 border-t-indigo-500" />
+      <div className="flex h-screen flex-col items-center justify-center gap-5 bg-slate-950">
+        <img src="/app-icon.svg" alt="JAILU" className="h-20 w-20 rounded-3xl shadow-2xl shadow-indigo-950" />
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-700 border-t-indigo-500" />
       </div>
     )
   }
@@ -70,7 +71,10 @@ export default function LibraryPage({ user }: LibraryPageProps) {
     <div className="flex h-screen flex-col bg-slate-950 text-white">
       <header className="shrink-0 border-b border-slate-800/80 px-4 pt-12 pb-3 sm:pt-6 sm:px-6">
         <div className="mx-auto flex max-w-lg items-center justify-between">
-          <span className="text-xl font-bold tracking-tight text-white">JAILU</span>
+          <div className="flex items-center gap-2.5">
+            <img src="/favicon.svg" alt="" className="h-8 w-8 rounded-xl" />
+            <span className="text-xl font-bold tracking-tight text-white">JAILU</span>
+          </div>
           <button
             onClick={() => setShowProfile(true)}
             className="flex items-center gap-2 rounded-xl bg-slate-800/60 px-3 py-1.5 ring-1 ring-white/5 transition hover:bg-slate-800"
