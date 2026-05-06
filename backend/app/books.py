@@ -4,7 +4,11 @@ import time
 import logging
 import unicodedata
 from pydantic import BaseModel
+from spellchecker import SpellChecker
 import httpx
+
+# Initialisé une fois au démarrage (dictionnaire fr bundlé dans le package)
+_spell_fr = SpellChecker(language='fr', distance=1)
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +113,35 @@ def _keywords_only(q: str) -> str:
     return ' '.join(keywords) if keywords else q
 
 
+def _spell_correct(q: str) -> str | None:
+    """
+    Corrige les fautes de lettres mot par mot.
+    Ignore les mots courts (≤4 chars) et les mots déjà connus du dictionnaire fr.
+    Retourne None si aucune correction n'est appliquée.
+    """
+    words = q.split()
+    # Seuil à 7 chars : évite les faux positifs sur les mots courts
+    # ("egares" → "gares" est un faux positif sans ce seuil)
+    candidates = [w.lower() for w in words if len(w) >= 7]
+    unknown = _spell_fr.unknown(candidates)
+    if not unknown:
+        return None
+
+    corrected = []
+    changed = False
+    for word in words:
+        w_lower = word.lower()
+        if w_lower in unknown:
+            suggestion = _spell_fr.correction(w_lower)
+            if suggestion and suggestion != w_lower:
+                corrected.append(suggestion)
+                changed = True
+                continue
+        corrected.append(word)
+
+    return ' '.join(corrected) if changed else None
+
+
 def _normalize_isbn(q: str) -> str | None:
     digits = re.sub(r'[\s\-]', '', q)
     if re.match(r'^97[89]\d{10}$', digits):
@@ -196,10 +229,19 @@ async def search_books(query: str, api_key: str) -> list[BookResult]:
 
         # Requêtes principales
         queries = _build_queries(cache_key)
+
+        # Variante sans accents
         stripped = _strip_accents(cache_key)
         if stripped != cache_key and stripped not in queries:
             queries.append(stripped)
-        queries = queries[:5]
+
+        # Variante corrigée orthographiquement (fautes de lettres)
+        corrected = _spell_correct(cache_key)
+        if corrected and corrected not in queries:
+            queries.append(corrected)
+            logger.info('Correction orthographique: "%s" → "%s"', cache_key, corrected)
+
+        queries = queries[:6]
 
         logger.info('Requêtes pour "%s": %s', cache_key, queries)
         results_lists = await asyncio.gather(*[_fetch(q, api_key, client) for q in queries])
