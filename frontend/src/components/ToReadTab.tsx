@@ -15,7 +15,7 @@ const STATUS_LABEL: Record<string, string> = {
   to_read: 'À lire',
 }
 
-const ACCENT = { reading: 'bg-indigo-500', to_read: 'bg-slate-700' }
+const ACCENT: Record<string, string> = { reading: 'bg-indigo-500', to_read: 'bg-slate-700', read: 'bg-emerald-500' }
 
 function BookRow({ book, onClick }: { book: UserBook; onClick: () => void }) {
   const toHttps = (url: string) => url.replace('http://', 'https://')
