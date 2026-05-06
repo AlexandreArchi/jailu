@@ -20,7 +20,6 @@ export default function ScanModal({ onScan, onClose }: ScanModalProps) {
       .decodeFromVideoDevice(undefined, videoRef.current, (result) => {
         if (!result || detected) return
         const text = result.getText()
-        // EAN-13 starting with 978 or 979 = ISBN-13
         if (/^97[89]\d{10}$/.test(text)) {
           setDetected(true)
           controlsRef.current?.stop()
@@ -40,61 +39,73 @@ export default function ScanModal({ onScan, onClose }: ScanModalProps) {
   }, [onScan, detected])
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 pt-12 pb-4 sm:pt-6">
-        <button
-          onClick={onClose}
-          className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-white transition hover:bg-white/20"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-        <p className="font-semibold text-white">Scanner un ISBN</p>
-      </div>
+    <div className="fixed inset-0 z-50 bg-black">
+      {/* Full-screen video */}
+      <video
+        ref={videoRef}
+        className="absolute inset-0 h-full w-full object-cover"
+        autoPlay
+        muted
+        playsInline
+      />
 
-      {/* Camera */}
-      <div className="relative flex-1 overflow-hidden">
-        <video
-          ref={videoRef}
-          className="h-full w-full object-cover"
-          autoPlay
-          muted
-          playsInline
-        />
+      {/* Dark overlay with cut-out effect */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        {/* Top shadow */}
+        <div className="w-full flex-1 bg-black/60" />
 
-        {/* Overlay avec zone de scan */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="relative">
-            <div className="h-28 w-72 rounded-2xl border-2 border-indigo-400 bg-transparent shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]" />
+        {/* Middle row: side shadows + scan zone */}
+        <div className="flex w-full items-center">
+          <div className="flex-1 bg-black/60" style={{ minWidth: '5%' }} />
+          {/* Scan zone */}
+          <div
+            className="relative"
+            style={{ width: '90%', aspectRatio: '3 / 1.3' }}
+          >
+            {/* Corner brackets */}
+            <span className="absolute top-0 left-0 h-6 w-6 border-t-2 border-l-2 border-indigo-400 rounded-tl-lg" />
+            <span className="absolute top-0 right-0 h-6 w-6 border-t-2 border-r-2 border-indigo-400 rounded-tr-lg" />
+            <span className="absolute bottom-0 left-0 h-6 w-6 border-b-2 border-l-2 border-indigo-400 rounded-bl-lg" />
+            <span className="absolute bottom-0 right-0 h-6 w-6 border-b-2 border-r-2 border-indigo-400 rounded-br-lg" />
+            {/* Scan line animation */}
+            {!detected && !error && (
+              <div className="absolute inset-x-0 top-0 h-0.5 bg-indigo-400/80 animate-scan" />
+            )}
             {detected && (
-              <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-emerald-500/30">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-8 w-8 text-emerald-400">
+              <div className="absolute inset-0 flex items-center justify-center bg-emerald-500/20 rounded-lg">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-10 w-10 text-emerald-400">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               </div>
             )}
-            {/* Corner decorations */}
-            {['top-0 left-0', 'top-0 right-0', 'bottom-0 left-0', 'bottom-0 right-0'].map((pos) => (
-              <div key={pos} className={`absolute ${pos} h-4 w-4`} />
-            ))}
           </div>
+          <div className="flex-1 bg-black/60" style={{ minWidth: '5%' }} />
+        </div>
+
+        {/* Bottom: shadow + instructions */}
+        <div className="w-full flex-1 bg-black/60 flex flex-col items-center justify-start pt-6 px-6 text-center">
+          {error ? (
+            <p className="text-sm text-red-400">{error}</p>
+          ) : detected ? (
+            <p className="text-sm font-medium text-emerald-400">ISBN détecté — recherche en cours…</p>
+          ) : (
+            <p className="text-sm text-slate-300">
+              Placez le code-barres au dos du livre dans le cadre
+            </p>
+          )}
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="px-6 py-6 text-center">
-        {error ? (
-          <p className="text-sm text-red-400">{error}</p>
-        ) : detected ? (
-          <p className="text-sm font-medium text-emerald-400">ISBN détecté — recherche en cours…</p>
-        ) : (
-          <p className="text-sm text-slate-400">
-            Pointez la caméra vers le code-barres au dos du livre
-          </p>
-        )}
-      </div>
+      {/* Floating close button */}
+      <button
+        onClick={onClose}
+        className="absolute top-12 right-4 sm:top-6 flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition hover:bg-black/70"
+        aria-label="Fermer"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
     </div>
   )
 }

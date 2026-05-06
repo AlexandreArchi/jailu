@@ -19,8 +19,8 @@ const ACCENT: Record<string, string> = { reading: 'bg-indigo-500', to_read: 'bg-
 
 function BookRow({ book, onClick }: { book: UserBook; onClick: () => void }) {
   const toHttps = (url: string) => url.replace('http://', 'https://')
-  const [src, setSrc] = useState(toHttps(book.coverUrl))
-  const fallback = toHttps(book.thumbnailUrl ?? '')
+  const [src, setSrc] = useState(toHttps(book.thumbnailUrl ?? book.coverUrl))
+  const fallback = toHttps(book.thumbnailUrl ? book.coverUrl : '')
 
   const dateAdded = book.createdAt
     ? new Date(book.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -84,7 +84,7 @@ export default function ToReadTab({ books, onBookClick }: ToReadTabProps) {
   const total = books.filter((b) => b.status === 'to_read' || b.status === 'reading').length
 
   return (
-    <div className="flex flex-1 flex-col pb-24">
+    <div className="flex min-h-0 flex-1 flex-col pb-24">
       <div className="px-4 pt-4 pb-3 sm:px-6">
         <h1 className="text-lg font-bold text-white">
           {total} livre{total > 1 ? 's' : ''} à lire

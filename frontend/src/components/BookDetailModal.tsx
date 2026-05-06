@@ -16,18 +16,34 @@ function StarRating({ value, onChange }: { value: number | null; onChange: (v: n
   const display = hovered ?? value ?? 0
   return (
     <div className="flex gap-1">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <button
-          key={star}
-          onClick={() => onChange(value === star ? null : star)}
-          onMouseEnter={() => setHovered(star)}
-          onMouseLeave={() => setHovered(null)}
-          className="text-2xl transition"
-          aria-label={`${star} étoile${star > 1 ? 's' : ''}`}
-        >
-          <span className={star <= display ? 'text-amber-400' : 'text-slate-600'}>★</span>
-        </button>
-      ))}
+      {[1, 2, 3, 4, 5].map((star) => {
+        const full = display >= star
+        const half = !full && display >= star - 0.5
+        return (
+          <div key={star} className="relative h-8 w-8" onMouseLeave={() => setHovered(null)}>
+            <span className="absolute inset-0 flex items-center justify-center text-2xl text-slate-600">★</span>
+            <span
+              className="absolute inset-0 flex items-center justify-center text-2xl text-amber-400"
+              style={{
+                opacity: full || half ? 1 : 0,
+                clipPath: half ? 'inset(0 50% 0 0)' : undefined,
+              }}
+            >★</span>
+            <button
+              className="absolute left-0 top-0 h-full w-1/2"
+              onClick={() => onChange(value === star - 0.5 ? null : star - 0.5)}
+              onMouseEnter={() => setHovered(star - 0.5)}
+              aria-label={`${star - 0.5} étoile`}
+            />
+            <button
+              className="absolute right-0 top-0 h-full w-1/2"
+              onClick={() => onChange(value === star ? null : star)}
+              onMouseEnter={() => setHovered(star)}
+              aria-label={`${star} étoile${star > 1 ? 's' : ''}`}
+            />
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -201,7 +217,11 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
                 {STATUSES.map((s) => (
                   <button
                     key={s}
-                    onClick={() => setStatus(s)}
+                    onClick={() => {
+                      setStatus(s)
+                      if (s === 'read' && !finishedAtInput) setFinishedAtInput(toInputDate(new Date()))
+                      if (s === 'reading' && !startedAtInput) setStartedAtInput(toInputDate(new Date()))
+                    }}
                     className={`flex-1 rounded-lg py-2 text-sm font-medium transition ${
                       status === s ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                     }`}
@@ -219,7 +239,23 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
             {readOnly ? (
               rating !== null ? (
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xl text-amber-400">{'★'.repeat(rating)}{'☆'.repeat(5 - rating)}</span>
+                  <div className="flex">
+                    {[1, 2, 3, 4, 5].map((star) => {
+                      const full = (rating ?? 0) >= star
+                      const half = !full && (rating ?? 0) >= star - 0.5
+                      return (
+                        <span key={star} className="relative text-xl">
+                          <span className="text-slate-600">★</span>
+                          {(full || half) && (
+                            <span
+                              className="absolute inset-0 text-amber-400"
+                              style={half ? { clipPath: 'inset(0 50% 0 0)' } : undefined}
+                            >★</span>
+                          )}
+                        </span>
+                      )
+                    })}
+                  </div>
                   <span className="text-sm text-slate-400">{rating}/5</span>
                 </div>
               ) : (

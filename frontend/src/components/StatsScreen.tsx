@@ -17,8 +17,8 @@ function formatReadingTime(minutes: number): string {
 
 function TopCover({ book, onClick }: { book: UserBook; onClick: () => void }) {
   const toHttps = (u: string) => u.replace('http://', 'https://')
-  const [src, setSrc] = useState(toHttps(book.coverUrl))
-  const fallback = toHttps(book.thumbnailUrl ?? '')
+  const [src, setSrc] = useState(toHttps(book.thumbnailUrl ?? book.coverUrl))
+  const fallback = toHttps(book.thumbnailUrl ? book.coverUrl : '')
   return (
     <button onClick={onClick} className="shrink-0">
       <div className="h-28 w-19 overflow-hidden rounded-xl bg-slate-700 shadow-lg">

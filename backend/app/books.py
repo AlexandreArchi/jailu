@@ -166,11 +166,19 @@ def _build_queries(q: str) -> list[str]:
         queries += [f'intitle:"{q}"', f'inauthor:"{q}"']
     else:
         # Longue requête : "auteur titre" OU "titre auteur"
-        # Auteur en premier (2 mots) : "amine maalouf le labyrinthe..."
+        # Auteur 1 mot en premier : "camus l'etranger"
+        queries.append(
+            f'inauthor:"{words[0]}" intitle:"{" ".join(words[1:])}"'
+        )
+        # Auteur 1 mot en dernier : "l'etranger camus"
+        queries.append(
+            f'intitle:"{" ".join(words[:-1])}" inauthor:"{words[-1]}"'
+        )
+        # Auteur 2 mots en premier : "amine maalouf le labyrinthe..."
         queries.append(
             f'inauthor:"{" ".join(words[:2])}" intitle:"{" ".join(words[2:])}"'
         )
-        # Auteur en dernier (2 mots) : "le labyrinthe... amine maalouf"
+        # Auteur 2 mots en dernier : "le labyrinthe... amine maalouf"
         queries.append(
             f'intitle:"{" ".join(words[:-2])}" inauthor:"{" ".join(words[-2:])}"'
         )
@@ -184,7 +192,7 @@ def _build_queries(q: str) -> list[str]:
         if q not in seen:
             seen.add(q)
             unique.append(q)
-    return unique[:4]  # max 4 requêtes parallèles
+    return unique[:6]  # max 6 requêtes parallèles
 
 
 async def _fetch(q: str, api_key: str, client: httpx.AsyncClient, max_results: int = 20) -> list[BookResult]:

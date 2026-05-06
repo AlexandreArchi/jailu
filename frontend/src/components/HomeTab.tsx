@@ -13,8 +13,8 @@ interface HomeTabProps {
 
 function CoverCard({ book, onClick }: { book: UserBook; onClick: () => void }) {
   const toHttps = (url: string) => url.replace('http://', 'https://')
-  const [src, setSrc] = useState(toHttps(book.coverUrl))
-  const fallback = toHttps(book.thumbnailUrl ?? '')
+  const [src, setSrc] = useState(toHttps(book.thumbnailUrl ?? book.coverUrl))
+  const fallback = toHttps(book.thumbnailUrl ? book.coverUrl : '')
 
   return (
     <button
@@ -43,8 +43,8 @@ function CoverCard({ book, onClick }: { book: UserBook; onClick: () => void }) {
 
 function LastReadItem({ book, onClick }: { book: UserBook; onClick: () => void }) {
   const toHttps = (url: string) => url.replace('http://', 'https://')
-  const [src, setSrc] = useState(toHttps(book.coverUrl))
-  const fallback = toHttps(book.thumbnailUrl ?? '')
+  const [src, setSrc] = useState(toHttps(book.thumbnailUrl ?? book.coverUrl))
+  const fallback = toHttps(book.thumbnailUrl ? book.coverUrl : '')
 
   return (
     <button

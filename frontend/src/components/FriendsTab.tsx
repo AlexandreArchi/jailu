@@ -106,7 +106,7 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
   }
 
   return (
-    <div className="flex flex-1 flex-col pb-24">
+    <div className="flex min-h-0 flex-1 flex-col pb-24">
       {/* Header + search */}
       <div className="px-4 pt-4 pb-3 sm:px-6 space-y-3">
         <div className="flex items-center justify-between">

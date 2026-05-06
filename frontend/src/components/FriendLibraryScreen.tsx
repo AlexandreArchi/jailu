@@ -10,8 +10,8 @@ interface Props {
 
 function CoverItem({ book, onClick }: { book: UserBook; onClick: () => void }) {
   const toHttps = (u: string) => u.replace('http://', 'https://')
-  const [src, setSrc] = useState(toHttps(book.coverUrl))
-  const fallback = toHttps(book.thumbnailUrl ?? '')
+  const [src, setSrc] = useState(toHttps(book.thumbnailUrl ?? book.coverUrl))
+  const fallback = toHttps(book.thumbnailUrl ? book.coverUrl : '')
 
   return (
     <button onClick={onClick} className="flex w-full items-center gap-3 py-3 border-b border-slate-800/50 text-left transition active:scale-[0.99]">
@@ -39,8 +39,8 @@ function CoverItem({ book, onClick }: { book: UserBook; onClick: () => void }) {
 
 function ReadingItem({ book }: { book: UserBook }) {
   const toHttps = (u: string) => u.replace('http://', 'https://')
-  const [src, setSrc] = useState(toHttps(book.coverUrl))
-  const fallback = toHttps(book.thumbnailUrl ?? '')
+  const [src, setSrc] = useState(toHttps(book.thumbnailUrl ?? book.coverUrl))
+  const fallback = toHttps(book.thumbnailUrl ? book.coverUrl : '')
 
   return (
     <div className="flex items-center gap-3 rounded-2xl bg-slate-800/50 px-3 py-3 ring-1 ring-white/5">
