@@ -31,9 +31,19 @@ function StarRating({ value, onChange }: { value: number | null; onChange: (v: n
   )
 }
 
-function formatDate(d: Date | null): string | null {
-  if (!d) return null
-  return new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+function toInputDate(d: Date | null): string {
+  if (!d) return ''
+  const date = new Date(d)
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+function fromInputDate(s: string): Date | null {
+  if (!s) return null
+  const d = new Date(s)
+  return isNaN(d.getTime()) ? null : d
 }
 
 function readingDays(start: Date | null, end: Date | null): number | null {
@@ -46,6 +56,8 @@ export default function BookDetailModal({ book, onClose, onUpdated }: BookDetail
   const [status, setStatus] = useState<BookStatus>(book.status)
   const [rating, setRating] = useState<number | null>(book.rating)
   const [notes, setNotes] = useState(book.notes ?? '')
+  const [startedAtInput, setStartedAtInput] = useState(toInputDate(book.startedAt))
+  const [finishedAtInput, setFinishedAtInput] = useState(toInputDate(book.finishedAt))
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -56,12 +68,18 @@ export default function BookDetailModal({ book, onClose, onUpdated }: BookDetail
   const [coverSrc, setCoverSrc] = useState(toHttps(book.coverUrl))
   const fallbackSrc = toHttps(book.thumbnailUrl ?? '')
 
+  const startedAt = fromInputDate(startedAtInput)
+  const finishedAt = fromInputDate(finishedAtInput)
+
   const handleSave = async () => {
     setIsSaving(true)
-    const extra: { startedAt?: Date | null; finishedAt?: Date | null } = {}
-    if (status === 'reading' && !book.startedAt) extra.startedAt = new Date()
-    if (status === 'read' && !book.finishedAt) extra.finishedAt = new Date()
-    if (status === 'read' && !book.startedAt && !book.startedAt) extra.startedAt = book.startedAt
+    const extra: { startedAt?: Date | null; finishedAt?: Date | null } = {
+      startedAt: startedAt,
+      finishedAt: finishedAt,
+    }
+    // Auto-set si vide et statut cohérent
+    if (!startedAt && status === 'reading') extra.startedAt = new Date()
+    if (!finishedAt && status === 'read') extra.finishedAt = new Date()
     await updateBook(book.id, { status, rating, notes: notes.trim() || null, ...extra })
     setIsSaving(false)
     onUpdated()
@@ -76,7 +94,7 @@ export default function BookDetailModal({ book, onClose, onUpdated }: BookDetail
     onClose()
   }
 
-  const days = readingDays(book.startedAt, book.finishedAt)
+  const days = readingDays(startedAt, finishedAt)
 
   return (
     <div
@@ -130,25 +148,32 @@ export default function BookDetailModal({ book, onClose, onUpdated }: BookDetail
 
         <div className="space-y-5 p-4 overflow-y-auto">
           {/* Dates de lecture */}
-          {(book.startedAt || book.finishedAt) && (
-            <div className="rounded-xl bg-slate-700/50 px-3 py-2.5 space-y-1">
-              {book.startedAt && (
-                <p className="text-xs text-slate-400">
-                  <span className="text-slate-500">Commencé le </span>
-                  {formatDate(book.startedAt)}
-                </p>
-              )}
-              {book.finishedAt && (
-                <p className="text-xs text-slate-400">
-                  <span className="text-slate-500">Terminé le </span>
-                  {formatDate(book.finishedAt)}
-                </p>
-              )}
-              {days !== null && (
-                <p className="text-xs font-medium text-indigo-400">{days} jour{days > 1 ? 's' : ''} de lecture</p>
-              )}
+          <div className="space-y-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Dates de lecture</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="mb-1 block text-[10px] text-slate-500">Commencé le</label>
+                <input
+                  type="date"
+                  value={startedAtInput}
+                  onChange={(e) => setStartedAtInput(e.target.value)}
+                  className="w-full rounded-lg bg-slate-700 px-2 py-1.5 text-sm text-white outline-none ring-1 ring-slate-600 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-[10px] text-slate-500">Terminé le</label>
+                <input
+                  type="date"
+                  value={finishedAtInput}
+                  onChange={(e) => setFinishedAtInput(e.target.value)}
+                  className="w-full rounded-lg bg-slate-700 px-2 py-1.5 text-sm text-white outline-none ring-1 ring-slate-600 focus:ring-indigo-500"
+                />
+              </div>
             </div>
-          )}
+            {days !== null && (
+              <p className="text-xs font-medium text-indigo-400">{days} jour{days > 1 ? 's' : ''} de lecture</p>
+            )}
+          </div>
 
           {/* Statut */}
           <div>
