@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { searchBooks } from '../lib/api'
-import { addBook } from '../lib/firestore'
+import { addBook, createStory } from '../lib/firestore'
 import type { BookResult, BookStatus } from '../types/book'
 import SearchBar from './SearchBar'
 import SearchResults from './SearchResults'
@@ -53,6 +53,12 @@ export default function SearchTab({ onBookAdded }: SearchTabProps) {
       await addBook(bookToAdd, status, finishedAt)
       onBookAdded()
       setAddedIds((prev) => new Set([...prev, bookToAdd.google_books_id]))
+      if (status === 'read') {
+        void createStory(
+          { title: bookToAdd.title, authors: bookToAdd.authors, coverUrl: bookToAdd.cover_url, thumbnailUrl: bookToAdd.thumbnail_url, googleBooksId: bookToAdd.google_books_id },
+          null,
+        )
+      }
       setBookToAdd(null)
     } finally {
       setIsAdding(false)

@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { storage, auth } from '../lib/firebase'
-import { updateBook, deleteBook, updateBookCover } from '../lib/firestore'
+import { updateBook, deleteBook, updateBookCover, createStory } from '../lib/firestore'
 import { BOOK_STATUS_LABELS, type BookStatus, type UserBook } from '../types/book'
 import RecommendBookModal from './RecommendBookModal'
 
@@ -119,6 +119,12 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
     if (!startedAt && status === 'reading') extra.startedAt = new Date()
     if (!finishedAt && status === 'read') extra.finishedAt = new Date()
     await updateBook(book.id, { status, rating, notes: notes.trim() || null, ...extra })
+    if (status === 'read' && book.status !== 'read') {
+      void createStory(
+        { title: book.title, authors: book.authors, coverUrl: book.coverUrl, thumbnailUrl: book.thumbnailUrl, googleBooksId: book.googleBooksId },
+        rating,
+      )
+    }
     setIsSaving(false)
     onUpdated()
     onClose()

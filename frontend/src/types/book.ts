@@ -42,6 +42,19 @@ export interface BookResult {
   categories: string[]
 }
 
+export interface Story {
+  id: string
+  fromUid: string
+  fromUsername: string
+  bookTitle: string
+  bookAuthors: string[]
+  bookCoverUrl: string
+  bookThumbnailUrl: string | null
+  googleBooksId: string | null
+  rating: number | null
+  createdAt: Date
+}
+
 export interface Recommendation {
   id: string
   bookTitle: string

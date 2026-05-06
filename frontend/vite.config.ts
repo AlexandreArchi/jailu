@@ -40,9 +40,30 @@ export default defineConfig({
           {
             urlPattern: /^https:\/\/firestore\.googleapis\.com\//,
             handler: 'NetworkFirst',
+            options: { cacheName: 'firestore-cache', networkTimeoutSeconds: 10 },
+          },
+          {
+            urlPattern: /^https:\/\/books\.google\.com\//,
+            handler: 'CacheFirst',
             options: {
-              cacheName: 'firestore-cache',
-              networkTimeoutSeconds: 10,
+              cacheName: 'book-covers',
+              expiration: { maxEntries: 300, maxAgeSeconds: 30 * 24 * 60 * 60 },
+            },
+          },
+          {
+            urlPattern: /^https:\/\/covers\.openlibrary\.org\//,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'book-covers',
+              expiration: { maxEntries: 300, maxAgeSeconds: 30 * 24 * 60 * 60 },
+            },
+          },
+          {
+            urlPattern: /^https:\/\/firebasestorage\.googleapis\.com\//,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'firebase-storage',
+              expiration: { maxEntries: 150, maxAgeSeconds: 14 * 24 * 60 * 60 },
             },
           },
         ],

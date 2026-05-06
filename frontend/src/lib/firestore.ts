@@ -1,5 +1,4 @@
 import {
-  getFirestore,
   collection,
   doc,
   getDoc,
@@ -16,10 +15,8 @@ import {
   onSnapshot,
   Timestamp,
 } from 'firebase/firestore'
-import { auth } from './firebase'
-import type { BookResult, BookStatus, UserBook, UserProfile, FriendEntry, FriendRequest, Recommendation } from '../types/book'
-
-const db = getFirestore(auth.app)
+import { auth, db } from './firebase'
+import type { BookResult, BookStatus, UserBook, UserProfile, FriendEntry, FriendRequest, Recommendation, Story } from '../types/book'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -384,4 +381,85 @@ export async function deleteRecommendation(id: string): Promise<void> {
   const userId = auth.currentUser?.uid
   if (!userId) throw new Error('Non authentifié')
   await deleteDoc(doc(db, 'users', userId, 'recommendations', id))
+}
+
+// ── stories ───────────────────────────────────────────────────────────────────
+
+export async function createStory(
+  book: { title: string; authors: string[]; coverUrl: string; thumbnailUrl: string | null; googleBooksId: string | null },
+  rating: number | null,
+): Promise<void> {
+  const userId = auth.currentUser?.uid
+  if (!userId) return
+  await addDoc(collection(db, 'users', userId, 'stories'), {
+    bookTitle: book.title,
+    bookAuthors: book.authors,
+    bookCoverUrl: book.coverUrl,
+    bookThumbnailUrl: book.thumbnailUrl ?? null,
+    googleBooksId: book.googleBooksId ?? null,
+    rating: rating ?? null,
+    createdAt: serverTimestamp(),
+  })
+}
+
+export async function getMyStories(): Promise<Story[]> {
+  const userId = auth.currentUser?.uid
+  if (!userId) return []
+  const sevenDaysAgo = Timestamp.fromDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
+  const q = query(
+    collection(db, 'users', userId, 'stories'),
+    where('createdAt', '>=', sevenDaysAgo),
+    orderBy('createdAt', 'desc'),
+  )
+  const snap = await getDocs(q)
+  return snap.docs.map((d) => ({
+    id: d.id,
+    fromUid: userId,
+    fromUsername: '',
+    bookTitle: d.data().bookTitle as string,
+    bookAuthors: d.data().bookAuthors as string[],
+    bookCoverUrl: d.data().bookCoverUrl as string,
+    bookThumbnailUrl: (d.data().bookThumbnailUrl as string | null) ?? null,
+    googleBooksId: (d.data().googleBooksId as string | null) ?? null,
+    rating: (d.data().rating as number | null) ?? null,
+    createdAt: toDate(d.data().createdAt) ?? new Date(),
+  }))
+}
+
+export async function getFriendsStories(friends: FriendEntry[]): Promise<Story[]> {
+  if (friends.length === 0) return []
+  const sevenDaysAgo = Timestamp.fromDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
+  const results = await Promise.all(
+    friends.map(async ({ uid, username }) => {
+      try {
+        const q = query(
+          collection(db, 'users', uid, 'stories'),
+          where('createdAt', '>=', sevenDaysAgo),
+          orderBy('createdAt', 'desc'),
+        )
+        const snap = await getDocs(q)
+        return snap.docs.map((d) => ({
+          id: d.id,
+          fromUid: uid,
+          fromUsername: username,
+          bookTitle: d.data().bookTitle as string,
+          bookAuthors: d.data().bookAuthors as string[],
+          bookCoverUrl: d.data().bookCoverUrl as string,
+          bookThumbnailUrl: (d.data().bookThumbnailUrl as string | null) ?? null,
+          googleBooksId: (d.data().googleBooksId as string | null) ?? null,
+          rating: (d.data().rating as number | null) ?? null,
+          createdAt: toDate(d.data().createdAt) ?? new Date(),
+        }))
+      } catch {
+        return []
+      }
+    }),
+  )
+  return results.flat()
+}
+
+export async function deleteMyStory(storyId: string): Promise<void> {
+  const userId = auth.currentUser?.uid
+  if (!userId) return
+  await deleteDoc(doc(db, 'users', userId, 'stories', storyId))
 }

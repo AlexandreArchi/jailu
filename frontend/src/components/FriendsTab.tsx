@@ -11,11 +11,14 @@ import {
   subscribeToFriends,
   subscribeToRecommendations,
   deleteRecommendation,
+  getFriendsStories,
+  getMyStories,
   type FriendshipStatus,
 } from '../lib/firestore'
-import type { FriendEntry, FriendRequest, Recommendation, UserProfile } from '../types/book'
+import type { FriendEntry, FriendRequest, Recommendation, Story, UserProfile } from '../types/book'
 import FriendLibraryScreen from './FriendLibraryScreen'
 import LeaderboardScreen from './LeaderboardScreen'
+import StoryModal from './StoryModal'
 
 interface Props {
   myUid: string
@@ -36,6 +39,13 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
   const [pendingRequests, setPendingRequests] = useState<FriendRequest[]>([])
   const [friends, setFriends] = useState<FriendEntry[]>([])
   const [recommendations, setRecommendations] = useState<Recommendation[]>([])
+  const [friendStories, setFriendStories] = useState<Story[]>([])
+  const [myStories, setMyStories] = useState<Story[]>([])
+  const [activeStories, setActiveStories] = useState<{ stories: Story[]; isMe: boolean } | null>(null)
+  const [seenIds, setSeenIds] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('seenStoryIds') ?? '[]') as string[]) }
+    catch { return new Set() }
+  })
   const [isLoading, setIsLoading] = useState(true)
   const [viewingFriend, setViewingFriend] = useState<FriendEntry | null>(null)
   const [showLeaderboard, setShowLeaderboard] = useState(false)
@@ -53,6 +63,17 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
     const unsubRecs = subscribeToRecommendations(setRecommendations)
     return () => { unsubReqs(); unsubFriends(); unsubRecs() }
   }, [myUid])
+
+  useEffect(() => {
+    if (friends.length === 0) return
+    void getFriendsStories(friends).then(setFriendStories)
+  }, [friends])
+
+  useEffect(() => {
+    void getMyStories().then((s) =>
+      setMyStories(s.map((story) => ({ ...story, fromUsername: myProfile.username })))
+    )
+  }, [myProfile.username])
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -89,6 +110,21 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
     await rejectFriendRequest(fromUid)
   }
 
+  const openStories = (uid: string, stories: Story[], isMe: boolean) => {
+    setActiveStories({ stories, isMe })
+    const newSeen = new Set(seenIds)
+    stories.forEach((s) => newSeen.add(s.id))
+    setSeenIds(newSeen)
+    localStorage.setItem('seenStoryIds', JSON.stringify([...newSeen]))
+  }
+
+  const storiesByUid = new Map<string, Story[]>()
+  for (const s of friendStories) {
+    if (!storiesByUid.has(s.fromUid)) storiesByUid.set(s.fromUid, [])
+    storiesByUid.get(s.fromUid)!.push(s)
+  }
+  if (myStories.length > 0) storiesByUid.set(myUid, myStories)
+
   const handleRemoveFriend = async (friendUid: string) => {
     await removeFriend(friendUid)
     if (viewingFriend?.uid === friendUid) setViewingFriend(null)
@@ -111,6 +147,19 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
 
   return (
     <div className="flex min-h-0 flex-1 flex-col pb-24">
+      {activeStories && (
+        <StoryModal
+          stories={activeStories.stories}
+          isMe={activeStories.isMe}
+          onClose={() => setActiveStories(null)}
+          onDeleted={(id) => {
+            setMyStories((prev) => prev.filter((s) => s.id !== id))
+            setActiveStories((prev) =>
+              prev ? { ...prev, stories: prev.stories.filter((s) => s.id !== id) } : null
+            )
+          }}
+        />
+      )}
       {/* Header + search */}
       <div className="px-4 pt-4 pb-3 sm:px-6 space-y-3">
         <div className="flex items-center justify-between">
@@ -203,6 +252,47 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
           </div>
         )}
       </div>
+
+      {/* Stories strip */}
+      {storiesByUid.size > 0 && (
+        <div className="px-4 pb-3 sm:px-6">
+          <div className="flex gap-4 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-hide">
+            {/* My stories bubble */}
+            {myStories.length > 0 && (() => {
+              const hasUnseen = myStories.some((s) => !seenIds.has(s.id))
+              return (
+                <button
+                  key="me"
+                  onClick={() => openStories(myUid, myStories, true)}
+                  className="flex shrink-0 flex-col items-center gap-1.5"
+                >
+                  <div className={`flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 transition ${hasUnseen ? 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-slate-950' : 'ring-1 ring-slate-700'}`}>
+                    <span className="text-lg font-bold text-indigo-300">{myProfile.username[0].toUpperCase()}</span>
+                  </div>
+                  <span className="max-w-[56px] truncate text-[10px] text-slate-400">Toi</span>
+                </button>
+              )
+            })()}
+            {/* Friends stories bubbles */}
+            {friends.filter((f) => storiesByUid.has(f.uid)).map((f) => {
+              const stories = storiesByUid.get(f.uid)!
+              const hasUnseen = stories.some((s) => !seenIds.has(s.id))
+              return (
+                <button
+                  key={f.uid}
+                  onClick={() => openStories(f.uid, stories, false)}
+                  className="flex shrink-0 flex-col items-center gap-1.5"
+                >
+                  <div className={`flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 transition ${hasUnseen ? 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-slate-950' : 'ring-1 ring-slate-700'}`}>
+                    <span className="text-lg font-bold text-slate-300">{f.username[0].toUpperCase()}</span>
+                  </div>
+                  <span className="max-w-[56px] truncate text-[10px] text-slate-400">@{f.username}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto px-4 sm:px-6 space-y-6">
         {isLoading ? (
