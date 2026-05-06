@@ -76,10 +76,17 @@ async def search_books(query: str, api_key: str) -> list[BookResult]:
         'key': api_key,
     }
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        response = await client.get(GOOGLE_BOOKS_URL, params=params)
-        response.raise_for_status()
-        data = response.json()
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(GOOGLE_BOOKS_URL, params=params)
+            response.raise_for_status()
+            data = response.json()
+    except httpx.HTTPStatusError as e:
+        logger.warning('Google Books API erreur %s pour query=%s', e.response.status_code, cache_key)
+        return []
+    except httpx.RequestError as e:
+        logger.error('Google Books API inaccessible : %s', e)
+        return []
 
     results: list[BookResult] = []
     for item in data.get('items', []):

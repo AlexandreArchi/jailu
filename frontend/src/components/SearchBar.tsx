@@ -12,7 +12,7 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
     const trimmed = value.trim()
-    if (trimmed.length >= 2) {
+    if (trimmed.length >= 3) {
       debounceRef.current = setTimeout(() => onSearch(trimmed), 500)
     } else if (trimmed.length === 0) {
       onSearch('')

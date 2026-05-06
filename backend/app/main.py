@@ -54,7 +54,7 @@ async def health() -> HealthResponse:
 
 
 @app.get('/api/books/search', response_model=list[BookResult])
-async def books_search(q: str = Query(min_length=2)) -> list[BookResult]:
+async def books_search(q: str = Query(min_length=3)) -> list[BookResult]:
     if not settings.google_books_api_key:
         raise HTTPException(status_code=503, detail='Clé Google Books non configurée')
     return await search_books(q, settings.google_books_api_key)
