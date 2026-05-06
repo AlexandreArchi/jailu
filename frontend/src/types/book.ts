@@ -34,6 +34,7 @@ export interface UserBook {
   pageCount: number | null
   description: string | null
   coverUrl: string
+  thumbnailUrl: string | null
   status: BookStatus
   rating: number | null
   notes: string | null
