@@ -2,6 +2,7 @@ import asyncio
 import re
 import time
 import logging
+import unicodedata
 from pydantic import BaseModel
 import httpx
 
@@ -92,6 +93,22 @@ def _score(book: BookResult) -> int:
     return s
 
 
+_FR_STOPWORDS = {'le', 'la', 'les', 'de', 'du', 'des', "l'", "d'", 'un', 'une', 'au', 'aux', 'en', 'et'}
+
+
+def _strip_accents(text: str) -> str:
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', text)
+        if unicodedata.category(c) != 'Mn'
+    )
+
+
+def _keywords_only(q: str) -> str:
+    words = q.split()
+    keywords = [w for w in words if w.lower() not in _FR_STOPWORDS and len(w) > 2]
+    return ' '.join(keywords) if keywords else q
+
+
 def _normalize_isbn(q: str) -> str | None:
     digits = re.sub(r'[\s\-]', '', q)
     if re.match(r'^97[89]\d{10}$', digits):
@@ -177,22 +194,40 @@ async def search_books(query: str, api_key: str) -> list[BookResult]:
                 _cache[cache_key] = (results, time.time())
                 return results
 
+        # Requêtes principales
         queries = _build_queries(cache_key)
-        logger.info('Requêtes parallèles pour "%s": %s', cache_key, queries)
+        stripped = _strip_accents(cache_key)
+        if stripped != cache_key and stripped not in queries:
+            queries.append(stripped)
+        queries = queries[:5]
+
+        logger.info('Requêtes pour "%s": %s', cache_key, queries)
         results_lists = await asyncio.gather(*[_fetch(q, api_key, client) for q in queries])
 
-    # Merge : la première liste (requête brute) donne la priorité de pertinence
-    seen: set[str] = set()
-    merged: list[BookResult] = []
-    for results in results_lists:
-        for book in results:
-            if book.google_books_id not in seen:
-                seen.add(book.google_books_id)
-                merged.append(book)
+        seen: set[str] = set()
+        merged: list[BookResult] = []
+        for results in results_lists:
+            for book in results:
+                if book.google_books_id not in seen:
+                    seen.add(book.google_books_id)
+                    merged.append(book)
+
+        # Fallback : si peu de résultats, retry sans articles français
+        if len(merged) < 3:
+            keywords = _keywords_only(cache_key)
+            if keywords != cache_key:
+                logger.info('Fallback mots-clés "%s" → "%s"', cache_key, keywords)
+                kw_lists = await asyncio.gather(
+                    *[_fetch(q, api_key, client) for q in _build_queries(keywords)[:3]]
+                )
+                for results in kw_lists:
+                    for book in results:
+                        if book.google_books_id not in seen:
+                            seen.add(book.google_books_id)
+                            merged.append(book)
 
     merged.sort(key=_score, reverse=True)
     final = merged[:15]
-
     _cache[cache_key] = (final, time.time())
     logger.info('%d résultats pour "%s" (pool: %d)', len(final), cache_key, len(merged))
     return final
