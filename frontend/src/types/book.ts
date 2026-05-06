@@ -5,6 +5,7 @@ export interface UserProfile {
   username: string
   photoURL: string | null
   createdAt: Date
+  readingGoal?: { year: number; target: number } | null
 }
 
 export interface FriendEntry {
@@ -39,6 +40,19 @@ export interface BookResult {
   cover_url: string
   thumbnail_url: string | null
   categories: string[]
+}
+
+export interface Recommendation {
+  id: string
+  bookTitle: string
+  bookAuthors: string[]
+  bookCoverUrl: string
+  bookThumbnailUrl: string | null
+  googleBooksId: string | null
+  fromUid: string
+  fromUsername: string
+  message: string | null
+  createdAt: Date
 }
 
 export interface UserBook {

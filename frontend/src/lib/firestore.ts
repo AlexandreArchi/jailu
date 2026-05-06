@@ -17,7 +17,7 @@ import {
   Timestamp,
 } from 'firebase/firestore'
 import { auth } from './firebase'
-import type { BookResult, BookStatus, UserBook, UserProfile, FriendEntry, FriendRequest } from '../types/book'
+import type { BookResult, BookStatus, UserBook, UserProfile, FriendEntry, FriendRequest, Recommendation } from '../types/book'
 
 const db = getFirestore(auth.app)
 
@@ -182,7 +182,14 @@ export async function getMyProfile(): Promise<UserProfile | null> {
     username: d.username as string,
     photoURL: (d.photoURL as string | null) ?? null,
     createdAt: toDate(d.createdAt) ?? new Date(),
+    readingGoal: (d.readingGoal as { year: number; target: number } | null) ?? null,
   }
+}
+
+export async function setReadingGoal(year: number, target: number | null): Promise<void> {
+  const userId = auth.currentUser?.uid
+  if (!userId) throw new Error('Non authentifié')
+  await updateDoc(doc(db, 'users', userId), { readingGoal: target === null ? null : { year, target } })
 }
 
 export async function updateUserPhotoURL(photoURL: string): Promise<void> {
@@ -328,4 +335,53 @@ export async function getFriendBooks(friendUid: string): Promise<UserBook[]> {
   const q = query(collection(db, 'users', friendUid, 'books'), orderBy('createdAt', 'desc'))
   const snapshot = await getDocs(q)
   return snapshot.docs.map(docToUserBook)
+}
+
+// ── recommendations ───────────────────────────────────────────────────────────
+
+export async function sendRecommendation(
+  toUid: string,
+  book: { title: string; authors: string[]; coverUrl: string; thumbnailUrl: string | null; googleBooksId: string | null },
+  message: string | null,
+  fromUsername: string,
+): Promise<void> {
+  const userId = auth.currentUser?.uid
+  if (!userId) throw new Error('Non authentifié')
+  await addDoc(collection(db, 'users', toUid, 'recommendations'), {
+    bookTitle: book.title,
+    bookAuthors: book.authors,
+    bookCoverUrl: book.coverUrl,
+    bookThumbnailUrl: book.thumbnailUrl ?? null,
+    googleBooksId: book.googleBooksId ?? null,
+    fromUid: userId,
+    fromUsername,
+    message: message ?? null,
+    createdAt: serverTimestamp(),
+  })
+}
+
+export function subscribeToRecommendations(callback: (recs: Recommendation[]) => void): () => void {
+  const userId = auth.currentUser?.uid
+  if (!userId) return () => {}
+  const q = query(collection(db, 'users', userId, 'recommendations'), orderBy('createdAt', 'desc'))
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map((d) => ({
+      id: d.id,
+      bookTitle: d.data().bookTitle as string,
+      bookAuthors: d.data().bookAuthors as string[],
+      bookCoverUrl: d.data().bookCoverUrl as string,
+      bookThumbnailUrl: (d.data().bookThumbnailUrl as string | null) ?? null,
+      googleBooksId: (d.data().googleBooksId as string | null) ?? null,
+      fromUid: d.data().fromUid as string,
+      fromUsername: d.data().fromUsername as string,
+      message: (d.data().message as string | null) ?? null,
+      createdAt: toDate(d.data().createdAt) ?? new Date(),
+    })))
+  })
+}
+
+export async function deleteRecommendation(id: string): Promise<void> {
+  const userId = auth.currentUser?.uid
+  if (!userId) throw new Error('Non authentifié')
+  await deleteDoc(doc(db, 'users', userId, 'recommendations', id))
 }

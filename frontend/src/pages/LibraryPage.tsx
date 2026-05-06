@@ -103,6 +103,8 @@ export default function LibraryPage({ user }: LibraryPageProps) {
             onGoToTab={(tab) => setActiveTab(tab)}
             onShowStats={() => setShowStats(true)}
             onGoToSearch={() => setActiveTab('search')}
+            goal={myProfile.readingGoal ?? null}
+            onGoalChange={(g) => setMyProfile({ ...myProfile, readingGoal: g })}
           />
         )}
         {activeTab === 'to_read' && (

@@ -3,6 +3,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { storage, auth } from '../lib/firebase'
 import { updateBook, deleteBook, updateBookCover } from '../lib/firestore'
 import { BOOK_STATUS_LABELS, type BookStatus, type UserBook } from '../types/book'
+import RecommendBookModal from './RecommendBookModal'
 
 interface BookDetailModalProps {
   book: UserBook
@@ -82,6 +83,7 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [showFullDesc, setShowFullDesc] = useState(false)
   const [isUploadingCover, setIsUploadingCover] = useState(false)
+  const [showRecommend, setShowRecommend] = useState(false)
   const coverFileRef = useRef<HTMLInputElement>(null)
 
   const handleCoverUpload = async (file: File) => {
@@ -369,6 +371,13 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
               </button>
 
               <button
+                onClick={() => setShowRecommend(true)}
+                className="w-full rounded-xl bg-slate-700 py-3 text-sm font-medium text-slate-300 transition hover:bg-slate-600 hover:text-white"
+              >
+                Recommander à un ami
+              </button>
+
+              <button
                 onClick={handleDelete}
                 disabled={isDeleting}
                 className={`w-full rounded-xl py-3 text-sm font-medium transition ${
@@ -378,6 +387,9 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
                 {isDeleting ? 'Suppression...' : confirmDelete ? 'Confirmer la suppression' : 'Supprimer ce livre'}
               </button>
             </>
+          )}
+          {showRecommend && (
+            <RecommendBookModal book={book} onClose={() => setShowRecommend(false)} />
           )}
         </div>
       </div>

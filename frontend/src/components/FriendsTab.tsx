@@ -9,9 +9,11 @@ import {
   checkFriendshipStatus,
   subscribeToPendingRequests,
   subscribeToFriends,
+  subscribeToRecommendations,
+  deleteRecommendation,
   type FriendshipStatus,
 } from '../lib/firestore'
-import type { FriendEntry, FriendRequest, UserProfile } from '../types/book'
+import type { FriendEntry, FriendRequest, Recommendation, UserProfile } from '../types/book'
 import FriendLibraryScreen from './FriendLibraryScreen'
 import LeaderboardScreen from './LeaderboardScreen'
 
@@ -33,6 +35,7 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
   const [searchState, setSearchState] = useState<SearchState>({ kind: 'idle' })
   const [pendingRequests, setPendingRequests] = useState<FriendRequest[]>([])
   const [friends, setFriends] = useState<FriendEntry[]>([])
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [viewingFriend, setViewingFriend] = useState<FriendEntry | null>(null)
   const [showLeaderboard, setShowLeaderboard] = useState(false)
@@ -47,7 +50,8 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
       setFriends(frs)
       setIsLoading(false)
     })
-    return () => { unsubReqs(); unsubFriends() }
+    const unsubRecs = subscribeToRecommendations(setRecommendations)
+    return () => { unsubReqs(); unsubFriends(); unsubRecs() }
   }, [myUid])
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -207,6 +211,50 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
           </div>
         ) : (
           <>
+            {/* Recommandations reçues */}
+            {recommendations.length > 0 && (
+              <section>
+                <h2 className="mb-3 text-sm font-semibold text-white">
+                  Recommandations
+                  <span className="ml-2 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">{recommendations.length}</span>
+                </h2>
+                <div className="space-y-2">
+                  {recommendations.map((rec) => {
+                    const toHttps = (url: string) => url.replace('http://', 'https://')
+                    return (
+                      <div key={rec.id} className="flex items-start gap-3 rounded-2xl bg-slate-800/60 px-4 py-3 ring-1 ring-white/5">
+                        <div className="h-14 w-10 shrink-0 overflow-hidden rounded-lg bg-slate-700">
+                          <img
+                            src={toHttps(rec.bookThumbnailUrl ?? rec.bookCoverUrl)}
+                            alt={rec.bookTitle}
+                            className="h-full w-full object-cover"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs text-indigo-400 font-medium">@{rec.fromUsername} recommande</p>
+                          <p className="text-sm font-semibold text-white truncate">{rec.bookTitle}</p>
+                          <p className="text-xs text-slate-500 truncate">{rec.bookAuthors.join(', ')}</p>
+                          {rec.message && (
+                            <p className="mt-1 text-xs text-slate-400 italic">"{rec.message}"</p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => void deleteRecommendation(rec.id)}
+                          className="shrink-0 rounded-lg p-1.5 text-slate-600 hover:text-slate-400 transition"
+                          aria-label="Ignorer"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+            )}
+
             {/* Demandes reçues */}
             {pendingRequests.length > 0 && (
               <section>

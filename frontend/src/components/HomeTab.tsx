@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { UserBook } from '../types/book'
+import GoalBanner from './GoalBanner'
 
 interface HomeTabProps {
   books: UserBook[]
@@ -9,6 +10,8 @@ interface HomeTabProps {
   onGoToTab: (tab: 'to_read' | 'read') => void
   onShowStats: () => void
   onGoToSearch: () => void
+  goal: { year: number; target: number } | null | undefined
+  onGoalChange: (goal: { year: number; target: number } | null) => void
 }
 
 function CoverCard({ book, onClick }: { book: UserBook; onClick: () => void }) {
@@ -73,7 +76,7 @@ function LastReadItem({ book, onClick }: { book: UserBook; onClick: () => void }
   )
 }
 
-export default function HomeTab({ books, isLoading, displayName, onBookClick, onGoToTab, onShowStats, onGoToSearch }: HomeTabProps) {
+export default function HomeTab({ books, isLoading, displayName, onBookClick, onGoToTab, onShowStats, onGoToSearch, goal, onGoalChange }: HomeTabProps) {
   const toRead = books.filter((b) => b.status === 'to_read')
   const reading = books.filter((b) => b.status === 'reading')
   const read = books.filter((b) => b.status === 'read')
@@ -123,6 +126,9 @@ export default function HomeTab({ books, isLoading, displayName, onBookClick, on
       </button>
 
       <div className="space-y-7 px-4 pt-5 sm:px-6">
+        {/* Reading goal banner */}
+        <GoalBanner readCount={read.length} goal={goal} onGoalChange={onGoalChange} />
+
         {/* Summary cards */}
         <div className="grid grid-cols-2 gap-3">
           <button
