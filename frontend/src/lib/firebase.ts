@@ -5,6 +5,7 @@ import {
   initializeFirestore,
   persistentLocalCache,
   persistentSingleTabManager,
+  type PersistentSingleTabManagerSettings,
 } from 'firebase/firestore'
 
 const firebaseConfig = {
@@ -20,6 +21,7 @@ const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
 export const storage = getStorage(app)
 export const googleProvider = new GoogleAuthProvider()
+const singleTabSettings: PersistentSingleTabManagerSettings = {}
 export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ tabManager: persistentSingleTabManager() }),
+  localCache: persistentLocalCache({ tabManager: persistentSingleTabManager(singleTabSettings) }),
 })

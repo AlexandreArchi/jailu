@@ -52,11 +52,6 @@ export default function App() {
           Mode hors ligne — tes données sont disponibles en cache
         </div>
       )}
-      {authState.status === 'loading' && (
-        <div className="flex min-h-screen items-center justify-center bg-slate-900">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-600 border-t-indigo-500" />
-        </div>
-      )}
       {authState.status === 'authenticated' && <LibraryPage user={authState.user} />}
       {authState.status === 'unauthenticated' && <LoginPage />}
     </>

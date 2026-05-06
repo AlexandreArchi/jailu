@@ -110,7 +110,7 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
     await rejectFriendRequest(fromUid)
   }
 
-  const openStories = (uid: string, stories: Story[], isMe: boolean) => {
+  const openStories = (_uid: string, stories: Story[], isMe: boolean) => {
     setActiveStories({ stories, isMe })
     const newSeen = new Set(seenIds)
     stories.forEach((s) => newSeen.add(s.id))
