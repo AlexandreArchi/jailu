@@ -115,16 +115,16 @@ def _build_queries(q: str) -> list[str]:
         # Courte requête : peut être un titre ou un auteur
         queries += [f'intitle:"{q}"', f'inauthor:"{q}"']
     else:
-        # Longue requête : probablement "auteur titre" — tester plusieurs points de coupure
-        # Coupure après le 1er mot : "prénom nom titre..."
-        queries.append(
-            f'inauthor:"{words[0]}" intitle:"{" ".join(words[1:])}"'
-        )
-        # Coupure après le 2e mot : "prénom nom titre..." (le plus courant)
+        # Longue requête : "auteur titre" OU "titre auteur"
+        # Auteur en premier (2 mots) : "amine maalouf le labyrinthe..."
         queries.append(
             f'inauthor:"{" ".join(words[:2])}" intitle:"{" ".join(words[2:])}"'
         )
-        # Recherche sur les derniers mots uniquement (titre seul)
+        # Auteur en dernier (2 mots) : "le labyrinthe... amine maalouf"
+        queries.append(
+            f'intitle:"{" ".join(words[:-2])}" inauthor:"{" ".join(words[-2:])}"'
+        )
+        # Titre seul sur les derniers mots (filet de sécurité)
         queries.append(f'intitle:"{" ".join(words[-3:])}"')
 
     # Dédupliquer en conservant l'ordre
