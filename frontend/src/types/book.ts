@@ -1,0 +1,43 @@
+export type BookStatus = 'read' | 'reading' | 'to_read'
+
+export const BOOK_STATUS_LABELS: Record<BookStatus, string> = {
+  read: 'Lu',
+  reading: 'En cours',
+  to_read: 'À lire',
+}
+
+export interface BookResult {
+  google_books_id: string
+  isbn13: string | null
+  isbn10: string | null
+  title: string
+  subtitle: string | null
+  authors: string[]
+  publisher: string | null
+  published_date: string | null
+  page_count: number | null
+  description: string | null
+  cover_url: string
+  thumbnail_url: string | null
+}
+
+export interface UserBook {
+  id: string
+  googleBooksId: string
+  isbn13: string | null
+  isbn10: string | null
+  title: string
+  subtitle: string | null
+  authors: string[]
+  publisher: string | null
+  publishedDate: string | null
+  pageCount: number | null
+  description: string | null
+  coverUrl: string
+  status: BookStatus
+  rating: number | null
+  notes: string | null
+  tags: string[]
+  createdAt: Date
+  updatedAt: Date
+}

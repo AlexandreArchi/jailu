@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     environment: str = 'development'
     version: str = '0.1.0'
     port: int = 8000
+    # En dev : valeur directe dans .env. En prod : chargée depuis Secret Manager au lifespan.
+    google_books_api_key: str = ''
 
 
 settings = Settings()
