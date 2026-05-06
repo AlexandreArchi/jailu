@@ -117,6 +117,7 @@ export default function LibraryPage({ user }: LibraryPageProps) {
         {activeTab === 'friends' && (
           <FriendsTab
             myUid={user.uid}
+            myProfile={myProfile}
             onPendingCountChange={setPendingFriendsCount}
           />
         )}
