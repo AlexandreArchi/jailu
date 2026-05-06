@@ -1,5 +1,23 @@
 export type BookStatus = 'read' | 'reading' | 'to_read'
 
+export interface UserProfile {
+  uid: string
+  username: string
+  createdAt: Date
+}
+
+export interface FriendEntry {
+  uid: string
+  username: string
+  since: Date
+}
+
+export interface FriendRequest {
+  uid: string
+  username: string
+  createdAt: Date
+}
+
 export const BOOK_STATUS_LABELS: Record<BookStatus, string> = {
   read: 'Lu',
   reading: 'En cours',

@@ -1,10 +1,11 @@
-type Tab = 'home' | 'to_read' | 'read' | 'search'
+type Tab = 'home' | 'to_read' | 'read' | 'search' | 'friends'
 
 interface BottomNavProps {
   active: Tab
   onChange: (tab: Tab) => void
   toReadCount: number
   readCount: number
+  pendingFriendsCount: number
 }
 
 function HomeIcon({ active }: { active: boolean }) {
@@ -40,12 +41,21 @@ function SearchIcon({ active }: { active: boolean }) {
   )
 }
 
-export default function BottomNav({ active, onChange, toReadCount, readCount }: BottomNavProps) {
+function FriendsIcon({ active }: { active: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.5 : 2} className="h-6 w-6">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+    </svg>
+  )
+}
+
+export default function BottomNav({ active, onChange, toReadCount, readCount, pendingFriendsCount }: BottomNavProps) {
   const tabs: { key: Tab; label: string; count?: number }[] = [
     { key: 'home', label: 'Résumé' },
     { key: 'to_read', label: 'À lire', count: toReadCount },
     { key: 'read', label: 'Lus', count: readCount },
-    { key: 'search', label: 'Recherche' },
+    { key: 'search', label: 'Chercher' },
+    { key: 'friends', label: 'Amis', count: pendingFriendsCount },
   ]
 
   return (
@@ -69,6 +79,7 @@ export default function BottomNav({ active, onChange, toReadCount, readCount }: 
                 {key === 'to_read' && <BookmarkIcon active={isActive} />}
                 {key === 'read' && <CheckIcon active={isActive} />}
                 {key === 'search' && <SearchIcon active={isActive} />}
+                {key === 'friends' && <FriendsIcon active={isActive} />}
                 {count !== undefined && count > 0 && (
                   <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-indigo-600 px-1 text-[9px] font-bold text-white">
                     {count}

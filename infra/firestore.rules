@@ -3,18 +3,42 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Bloc global par défaut : aucun accès non authentifié
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // Un utilisateur ne peut accéder qu'à son propre document
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Tout utilisateur connecté peut lire les profils (recherche par pseudo)
+      allow read: if request.auth != null;
+      // Seul le propriétaire peut créer/modifier son profil
+      allow create, update: if request.auth != null && request.auth.uid == userId;
 
-      // Sous-collections (livres) — activées au jalon 2
       match /books/{bookId} {
+        // Accès complet pour le propriétaire
         allow read, write: if request.auth != null && request.auth.uid == userId;
+        // Lecture pour les amis confirmés
+        allow read: if request.auth != null &&
+          exists(/databases/$(database)/documents/users/$(userId)/friends/$(request.auth.uid));
+      }
+
+      match /friends/{friendUid} {
+        // Le propriétaire et l'ami peuvent lire
+        allow read: if request.auth != null &&
+          (request.auth.uid == userId || request.auth.uid == friendUid);
+        // Le propriétaire ou l'ami peuvent écrire (acceptation bilatérale via batch)
+        allow write: if request.auth != null &&
+          (request.auth.uid == userId || request.auth.uid == friendUid);
+      }
+
+      match /friendRequests/{fromUid} {
+        // Le destinataire et l'expéditeur peuvent lire
+        allow read: if request.auth != null &&
+          (request.auth.uid == userId || request.auth.uid == fromUid);
+        // Seul l'expéditeur peut créer
+        allow create: if request.auth != null && request.auth.uid == fromUid;
+        // L'un ou l'autre peut supprimer (accepter/refuser/annuler)
+        allow delete: if request.auth != null &&
+          (request.auth.uid == userId || request.auth.uid == fromUid);
       }
     }
   }

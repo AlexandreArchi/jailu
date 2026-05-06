@@ -2,30 +2,36 @@ import { useCallback, useEffect, useState } from 'react'
 import { signOut } from 'firebase/auth'
 import type { User } from 'firebase/auth'
 import { auth } from '../lib/firebase'
-import { getUserBooks } from '../lib/firestore'
+import { getUserBooks, getMyProfile } from '../lib/firestore'
 import BottomNav from '../components/BottomNav'
 import HomeTab from '../components/HomeTab'
 import ToReadTab from '../components/ToReadTab'
 import ReadTab from '../components/ReadTab'
 import SearchTab from '../components/SearchTab'
+import FriendsTab from '../components/FriendsTab'
 import BookDetailModal from '../components/BookDetailModal'
 import StatsScreen from '../components/StatsScreen'
-import type { UserBook } from '../types/book'
+import UsernameSetupModal from '../components/UsernameSetupModal'
+import type { UserBook, UserProfile } from '../types/book'
 
-type Tab = 'home' | 'to_read' | 'read' | 'search'
+type Tab = 'home' | 'to_read' | 'read' | 'search' | 'friends'
 
 interface LibraryPageProps {
   user: User
 }
 
 export default function LibraryPage({ user }: LibraryPageProps) {
-  const displayName = user.displayName ?? user.email ?? 'Lecteur'
-
+  const [myProfile, setMyProfile] = useState<UserProfile | null | 'loading'>('loading')
   const [userBooks, setUserBooks] = useState<UserBook[]>([])
   const [isBooksLoading, setIsBooksLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('home')
   const [bookToEdit, setBookToEdit] = useState<UserBook | null>(null)
   const [showStats, setShowStats] = useState(false)
+  const [pendingFriendsCount, setPendingFriendsCount] = useState(0)
+
+  useEffect(() => {
+    getMyProfile().then(setMyProfile).catch(() => setMyProfile(null))
+  }, [user.uid])
 
   const loadBooks = useCallback(async () => {
     try {
@@ -42,15 +48,32 @@ export default function LibraryPage({ user }: LibraryPageProps) {
 
   const toReadCount = userBooks.filter((b) => b.status === 'to_read' || b.status === 'reading').length
   const readCount = userBooks.filter((b) => b.status === 'read').length
+  const displayName = myProfile && myProfile !== 'loading' ? myProfile.username : (user.displayName ?? user.email ?? 'Lecteur')
 
-  const handleBookClick = (book: UserBook) => setBookToEdit(book)
+  if (myProfile === 'loading') {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-950">
+        <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-700 border-t-indigo-500" />
+      </div>
+    )
+  }
+
+  if (myProfile === null) {
+    return (
+      <UsernameSetupModal
+        onComplete={(profile) => setMyProfile(profile)}
+      />
+    )
+  }
 
   return (
     <div className="flex h-screen flex-col bg-slate-950 text-white">
-      {/* Header */}
       <header className="shrink-0 border-b border-slate-800/80 px-4 pt-12 pb-3 sm:pt-6 sm:px-6">
         <div className="mx-auto flex max-w-lg items-center justify-between">
-          <span className="text-xl font-bold tracking-tight text-white">JAILU</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xl font-bold tracking-tight text-white">JAILU</span>
+            <span className="text-xs text-slate-500">@{myProfile.username}</span>
+          </div>
           <button
             onClick={() => void signOut(auth)}
             className="rounded-lg px-3 py-1.5 text-xs text-slate-500 transition hover:text-slate-300"
@@ -60,31 +83,36 @@ export default function LibraryPage({ user }: LibraryPageProps) {
         </div>
       </header>
 
-      {/* Tab content */}
       <div className="mx-auto flex w-full max-w-lg flex-1 flex-col overflow-hidden">
         {activeTab === 'home' && (
           <HomeTab
             books={userBooks}
             isLoading={isBooksLoading}
             displayName={displayName}
-            onBookClick={handleBookClick}
+            onBookClick={(book) => setBookToEdit(book)}
             onGoToTab={(tab) => setActiveTab(tab)}
             onShowStats={() => setShowStats(true)}
             onGoToSearch={() => setActiveTab('search')}
           />
         )}
         {activeTab === 'to_read' && (
-          <ToReadTab books={userBooks} onBookClick={handleBookClick} />
+          <ToReadTab books={userBooks} onBookClick={(book) => setBookToEdit(book)} />
         )}
         {activeTab === 'read' && (
           <ReadTab
             books={userBooks}
-            onBookClick={handleBookClick}
+            onBookClick={(book) => setBookToEdit(book)}
             onShowStats={() => setShowStats(true)}
           />
         )}
         {activeTab === 'search' && (
           <SearchTab onBookAdded={() => void loadBooks()} />
+        )}
+        {activeTab === 'friends' && (
+          <FriendsTab
+            myUid={user.uid}
+            onPendingCountChange={setPendingFriendsCount}
+          />
         )}
       </div>
 
@@ -93,6 +121,7 @@ export default function LibraryPage({ user }: LibraryPageProps) {
         onChange={setActiveTab}
         toReadCount={toReadCount}
         readCount={readCount}
+        pendingFriendsCount={pendingFriendsCount}
       />
 
       {bookToEdit !== null && (
