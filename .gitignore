@@ -1,0 +1,26 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+dist/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Env files (jamais commités)
+.env
+.env.local
+*.env.local
+
+# IDE
+.vscode/settings.json
+.idea/
+*.suo
+
+# Build artifacts
+frontend/dist/

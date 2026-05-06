@@ -1,0 +1,71 @@
+name: Backend — Build & Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/**'
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  REGION: europe-west1
+  SERVICE_NAME: jailu-api
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authentification GCP via WIF
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Configurer Docker pour Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build image Docker
+        working-directory: backend
+        run: |
+          docker build \
+            --tag europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/jailu-backend/api:${{ github.sha }} \
+            --tag europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/jailu-backend/api:latest \
+            .
+
+      - name: Push image Docker
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          docker push europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/jailu-backend/api:${{ github.sha }}
+          docker push europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/jailu-backend/api:latest
+
+      - name: Déploiement Cloud Run
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          region: ${{ env.REGION }}
+          image: europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/jailu-backend/api:${{ github.sha }}
+          service_account: jailu-cloudrun-sa@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com
+          env_vars: |
+            GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}
+            ENVIRONMENT=production
+            VERSION=${{ github.sha }}
+          flags: |
+            --min-instances=0
+            --max-instances=3
+            --memory=512Mi
+            --cpu=1
+            --concurrency=80
+            --allow-unauthenticated

@@ -1,0 +1,21 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Bloc global par défaut : aucun accès non authentifié
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Un utilisateur ne peut accéder qu'à son propre document
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // Sous-collections (livres) — activées au jalon 2
+      match /books/{bookId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+  }
+}
