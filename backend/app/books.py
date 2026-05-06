@@ -101,6 +101,42 @@ def _normalize_isbn(q: str) -> str | None:
     return None
 
 
+def _build_queries(q: str) -> list[str]:
+    """
+    Construit plusieurs variantes de requête pour maximiser les chances de trouver un livre.
+    Les guillemets sont essentiels pour les préfixes intitle:/inauthor: sur plusieurs mots.
+    """
+    words = q.split()
+    queries: list[str] = [q]  # requête brute en premier
+
+    if len(words) == 1:
+        queries += [f'intitle:"{q}"', f'inauthor:"{q}"']
+    elif len(words) <= 3:
+        # Courte requête : peut être un titre ou un auteur
+        queries += [f'intitle:"{q}"', f'inauthor:"{q}"']
+    else:
+        # Longue requête : probablement "auteur titre" — tester plusieurs points de coupure
+        # Coupure après le 1er mot : "prénom nom titre..."
+        queries.append(
+            f'inauthor:"{words[0]}" intitle:"{" ".join(words[1:])}"'
+        )
+        # Coupure après le 2e mot : "prénom nom titre..." (le plus courant)
+        queries.append(
+            f'inauthor:"{" ".join(words[:2])}" intitle:"{" ".join(words[2:])}"'
+        )
+        # Recherche sur les derniers mots uniquement (titre seul)
+        queries.append(f'intitle:"{" ".join(words[-3:])}"')
+
+    # Dédupliquer en conservant l'ordre
+    seen: set[str] = set()
+    unique = []
+    for q in queries:
+        if q not in seen:
+            seen.add(q)
+            unique.append(q)
+    return unique[:4]  # max 4 requêtes parallèles
+
+
 async def _fetch(q: str, api_key: str, client: httpx.AsyncClient, max_results: int = 20) -> list[BookResult]:
     params = {
         'q': q,
@@ -133,7 +169,7 @@ async def search_books(query: str, api_key: str) -> list[BookResult]:
         return cached[0]
 
     async with httpx.AsyncClient(timeout=10.0) as client:
-        # ISBN detection: search directly by ISBN
+        # ISBN direct
         isbn = _normalize_isbn(cache_key)
         if isbn:
             results = await _fetch(f'isbn:{isbn}', api_key, client, max_results=5)
@@ -141,17 +177,11 @@ async def search_books(query: str, api_key: str) -> list[BookResult]:
                 _cache[cache_key] = (results, time.time())
                 return results
 
-        # Build parallel queries: general + author-focused + title-focused
-        queries = [cache_key, f'intitle:{cache_key}']
-        # For short queries (likely an author name), also search by author
-        words = cache_key.split()
-        if len(words) <= 3:
-            queries.append(f'inauthor:{cache_key}')
+        queries = _build_queries(cache_key)
+        logger.info('Requêtes parallèles pour "%s": %s', cache_key, queries)
+        results_lists = await asyncio.gather(*[_fetch(q, api_key, client) for q in queries])
 
-        tasks = [_fetch(q, api_key, client) for q in queries]
-        results_lists = await asyncio.gather(*tasks)
-
-    # Merge and deduplicate (keep first occurrence = highest relevance from main query)
+    # Merge : la première liste (requête brute) donne la priorité de pertinence
     seen: set[str] = set()
     merged: list[BookResult] = []
     for results in results_lists:
@@ -160,10 +190,9 @@ async def search_books(query: str, api_key: str) -> list[BookResult]:
                 seen.add(book.google_books_id)
                 merged.append(book)
 
-    # Re-rank by completeness score
     merged.sort(key=_score, reverse=True)
     final = merged[:15]
 
     _cache[cache_key] = (final, time.time())
-    logger.info('%d résultats pour "%s" (avant dédup: %d)', len(final), cache_key, len(merged))
+    logger.info('%d résultats pour "%s" (pool: %d)', len(final), cache_key, len(merged))
     return final
