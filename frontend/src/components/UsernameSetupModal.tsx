@@ -30,7 +30,7 @@ export default function UsernameSetupModal({ onComplete }: Props) {
     if (status !== 'available') return
     setIsSaving(true)
     await createUserProfile(value)
-    onComplete({ uid: '', username: value, createdAt: new Date() })
+    onComplete({ uid: '', username: value, photoURL: null, createdAt: new Date() })
   }
 
   const hint =
