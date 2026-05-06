@@ -19,6 +19,7 @@ export default function SearchTab({ onBookAdded }: SearchTabProps) {
   const [bookToAdd, setBookToAdd] = useState<BookResult | null>(null)
   const [isAdding, setIsAdding] = useState(false)
   const [showScan, setShowScan] = useState(false)
+  const [addedIds, setAddedIds] = useState<Set<string>>(new Set())
 
   const runSearch = useCallback(async (q: string) => {
     setQuery(q)
@@ -49,9 +50,8 @@ export default function SearchTab({ onBookAdded }: SearchTabProps) {
     try {
       await addBook(bookToAdd, status, finishedAt)
       onBookAdded()
+      setAddedIds((prev) => new Set([...prev, bookToAdd.google_books_id]))
       setBookToAdd(null)
-      setQuery('')
-      setResults([])
     } finally {
       setIsAdding(false)
     }
@@ -79,7 +79,7 @@ export default function SearchTab({ onBookAdded }: SearchTabProps) {
 
       <div className="flex-1 overflow-y-auto px-4 sm:px-6">
         {query ? (
-          <SearchResults results={results} onAdd={setBookToAdd} />
+          <SearchResults results={results} onAdd={setBookToAdd} addedIds={addedIds} />
         ) : (
           <div className="py-12 text-center">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="mx-auto h-12 w-12 text-slate-700">

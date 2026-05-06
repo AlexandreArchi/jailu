@@ -11,6 +11,7 @@ interface BookCardResultProps {
   variant: 'result'
   book: BookResult
   onAdd: (book: BookResult) => void
+  added?: boolean
 }
 
 interface BookCardLibraryProps {
@@ -84,6 +85,13 @@ export default function BookCard(props: BookCardProps) {
           {props.variant === 'library' ? (
             <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[props.book.status]}`}>
               {BOOK_STATUS_LABELS[props.book.status]}
+            </span>
+          ) : props.added ? (
+            <span className="flex items-center gap-1 rounded-lg bg-emerald-600/20 px-3 py-1 text-xs font-medium text-emerald-400">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-3 w-3">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              Ajouté
             </span>
           ) : (
             <button
