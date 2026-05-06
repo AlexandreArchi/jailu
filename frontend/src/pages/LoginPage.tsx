@@ -3,7 +3,6 @@ import {
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  sendEmailVerification,
   sendPasswordResetEmail,
   type AuthError,
 } from 'firebase/auth'
@@ -70,8 +69,7 @@ export default function LoginPage() {
     }
     setIsLoading(true)
     try {
-      const cred = await createUserWithEmailAndPassword(auth, email, password)
-      await sendEmailVerification(cred.user)
+      await createUserWithEmailAndPassword(auth, email, password)
     } catch (err) {
       setError(authErrorMessage(err as AuthError))
       setIsLoading(false)

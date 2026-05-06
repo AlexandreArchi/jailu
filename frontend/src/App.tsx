@@ -3,7 +3,6 @@ import { onAuthStateChanged, type User } from 'firebase/auth'
 import { auth } from './lib/firebase'
 import LoginPage from './pages/LoginPage'
 import LibraryPage from './pages/LibraryPage'
-import EmailVerificationPage from './pages/EmailVerificationPage'
 
 function useOnlineStatus() {
   const [isOnline, setIsOnline] = useState(navigator.onLine)
@@ -53,13 +52,7 @@ export default function App() {
           Mode hors ligne — tes données sont disponibles en cache
         </div>
       )}
-      {authState.status === 'authenticated' && (() => {
-        const isEmailUser = authState.user.providerData.some((p) => p.providerId === 'password')
-        if (isEmailUser && !authState.user.emailVerified) {
-          return <EmailVerificationPage user={authState.user} />
-        }
-        return <LibraryPage user={authState.user} />
-      })()}
+      {authState.status === 'authenticated' && <LibraryPage user={authState.user} />}
       {authState.status === 'unauthenticated' && <LoginPage />}
     </>
   )
