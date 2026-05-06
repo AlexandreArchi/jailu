@@ -3,6 +3,7 @@ export type BookStatus = 'read' | 'reading' | 'to_read'
 export interface UserProfile {
   uid: string
   username: string
+  photoURL: string | null
   createdAt: Date
 }
 

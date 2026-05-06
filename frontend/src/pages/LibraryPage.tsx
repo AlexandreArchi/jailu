@@ -75,8 +75,14 @@ export default function LibraryPage({ user }: LibraryPageProps) {
             onClick={() => setShowProfile(true)}
             className="flex items-center gap-2 rounded-xl bg-slate-800/60 px-3 py-1.5 ring-1 ring-white/5 transition hover:bg-slate-800"
           >
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600/30">
-              <span className="text-[10px] font-bold text-indigo-400">{myProfile.username[0].toUpperCase()}</span>
+            <div className="h-6 w-6 overflow-hidden rounded-full bg-indigo-600/30 ring-1 ring-indigo-500/30">
+              {myProfile.photoURL ? (
+                <img src={myProfile.photoURL} alt={myProfile.username} className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center">
+                  <span className="text-[10px] font-bold text-indigo-400">{myProfile.username[0].toUpperCase()}</span>
+                </div>
+              )}
             </div>
             <span className="text-xs font-medium text-slate-300">@{myProfile.username}</span>
           </button>
@@ -133,7 +139,12 @@ export default function LibraryPage({ user }: LibraryPageProps) {
       )}
 
       {showProfile && (
-        <ProfileModal user={user} profile={myProfile} onClose={() => setShowProfile(false)} />
+        <ProfileModal
+          user={user}
+          profile={myProfile}
+          onClose={() => setShowProfile(false)}
+          onPhotoUpdated={(url) => setMyProfile({ ...myProfile, photoURL: url })}
+        />
       )}
 
       {showStats && (

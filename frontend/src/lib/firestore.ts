@@ -127,7 +127,7 @@ export async function deleteBook(bookId: string): Promise<void> {
 export async function createUserProfile(username: string): Promise<void> {
   const userId = auth.currentUser?.uid
   if (!userId) throw new Error('Non authentifié')
-  await setDoc(doc(db, 'users', userId), { username, createdAt: serverTimestamp() })
+  await setDoc(doc(db, 'users', userId), { username, photoURL: null, createdAt: serverTimestamp() })
 }
 
 export async function getMyProfile(): Promise<UserProfile | null> {
@@ -136,7 +136,18 @@ export async function getMyProfile(): Promise<UserProfile | null> {
   const snap = await getDoc(doc(db, 'users', userId))
   if (!snap.exists()) return null
   const d = snap.data()
-  return { uid: userId, username: d.username as string, createdAt: toDate(d.createdAt) ?? new Date() }
+  return {
+    uid: userId,
+    username: d.username as string,
+    photoURL: (d.photoURL as string | null) ?? null,
+    createdAt: toDate(d.createdAt) ?? new Date(),
+  }
+}
+
+export async function updateUserPhotoURL(photoURL: string): Promise<void> {
+  const userId = auth.currentUser?.uid
+  if (!userId) throw new Error('Non authentifié')
+  await updateDoc(doc(db, 'users', userId), { photoURL })
 }
 
 export async function checkUsernameAvailable(username: string): Promise<boolean> {
@@ -150,7 +161,12 @@ export async function searchUserByUsername(username: string): Promise<UserProfil
   const snap = await getDocs(q)
   if (snap.empty) return null
   const d = snap.docs[0]
-  return { uid: d.id, username: d.data().username as string, createdAt: toDate(d.data().createdAt) ?? new Date() }
+  return {
+    uid: d.id,
+    username: d.data().username as string,
+    photoURL: (d.data().photoURL as string | null) ?? null,
+    createdAt: toDate(d.data().createdAt) ?? new Date(),
+  }
 }
 
 // ── friend requests ───────────────────────────────────────────────────────────

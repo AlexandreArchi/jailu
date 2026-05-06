@@ -22,5 +22,8 @@
   "firestore": {
     "rules": "infra/firestore.rules",
     "indexes": "infra/firestore.indexes.json"
+  },
+  "storage": {
+    "rules": "infra/storage.rules"
   }
 }
