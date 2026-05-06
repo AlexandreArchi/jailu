@@ -71,8 +71,8 @@ async def search_books(query: str, api_key: str) -> list[BookResult]:
 
     params = {
         'q': query,
-        'langRestrict': 'fr',
-        'maxResults': 10,
+        'maxResults': 15,
+        'orderBy': 'relevance',
         'key': api_key,
     }
 
