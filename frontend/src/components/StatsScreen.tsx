@@ -171,22 +171,22 @@ export default function StatsScreen({ books, onClose, onBookClick }: StatsScreen
                 Répartition des notes
               </h2>
               <div className="rounded-2xl bg-slate-800/60 p-4">
-                <div className="flex h-32 items-end justify-around gap-2">
+                <div className="flex items-end gap-2" style={{ height: '96px' }}>
                   {[1, 2, 3, 4, 5].map((star) => {
                     const count = ratingCounts[star] ?? 0
-                    const pct = (count / maxRatingCount) * 100
+                    const barH = maxRatingCount > 0
+                      ? Math.round((count / maxRatingCount) * 72)
+                      : 0
                     return (
-                      <div key={star} className="flex flex-1 flex-col items-center gap-1.5">
+                      <div key={star} className="flex flex-1 flex-col items-center justify-end gap-1">
                         {count > 0 && (
-                          <span className="text-xs font-medium text-slate-400">{count}</span>
+                          <span className="text-[10px] font-semibold text-slate-300">{count}</span>
                         )}
-                        <div className="w-full rounded-t-md bg-slate-700" style={{ height: '88px' }}>
-                          <div
-                            className="w-full rounded-t-md bg-indigo-500 transition-all"
-                            style={{ height: `${pct}%`, marginTop: `${100 - pct}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-slate-500">{star}★</span>
+                        <div
+                          className="w-full rounded-t-md bg-indigo-500"
+                          style={{ height: `${Math.max(barH, 3)}px` }}
+                        />
+                        <span className="text-[10px] text-slate-500">{star}★</span>
                       </div>
                     )
                   })}

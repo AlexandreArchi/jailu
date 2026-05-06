@@ -44,6 +44,11 @@ function BookRow({ book, onClick }: { book: UserBook; onClick: () => void }) {
             <span className="ml-1 text-slate-500">{book.rating}/5</span>
           </p>
         )}
+        {book.finishedAt && (
+          <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-600">
+            Terminé le {new Date(book.finishedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+          </p>
+        )}
       </div>
 
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4 shrink-0 text-slate-700">

@@ -70,6 +70,7 @@ export default function LibraryPage({ user }: LibraryPageProps) {
             onBookClick={handleBookClick}
             onGoToTab={(tab) => setActiveTab(tab)}
             onShowStats={() => setShowStats(true)}
+            onGoToSearch={() => setActiveTab('search')}
           />
         )}
         {activeTab === 'to_read' && (

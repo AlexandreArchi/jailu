@@ -87,6 +87,17 @@ export default function BookDetailModal({ book, onClose, onUpdated }: BookDetail
         className="w-full max-w-sm rounded-t-2xl bg-slate-800 sm:rounded-2xl overflow-hidden max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
+        <div className="flex justify-end px-3 pt-3">
+          <button
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-slate-400 transition hover:bg-slate-600 hover:text-white"
+            aria-label="Fermer"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
         <div className="flex gap-3 bg-slate-700 p-4">
           {coverSrc && (
             <img
@@ -97,6 +108,7 @@ export default function BookDetailModal({ book, onClose, onUpdated }: BookDetail
             />
           )}
           <div className="min-w-0 flex-1">
+
             <p className="font-semibold text-white leading-tight">{book.title}</p>
             <p className="mt-0.5 text-sm text-slate-400">
               {book.authors.join(', ')}{year ? ` · ${year}` : ''}

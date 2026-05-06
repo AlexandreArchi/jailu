@@ -8,6 +8,7 @@ interface HomeTabProps {
   onBookClick: (book: UserBook) => void
   onGoToTab: (tab: 'to_read' | 'read') => void
   onShowStats: () => void
+  onGoToSearch: () => void
 }
 
 function CoverThumb({
@@ -58,6 +59,7 @@ export default function HomeTab({
   onBookClick,
   onGoToTab,
   onShowStats,
+  onGoToSearch,
 }: HomeTabProps) {
   const toRead = books.filter((b) => b.status === 'to_read')
   const reading = books.filter((b) => b.status === 'reading')
@@ -84,6 +86,16 @@ export default function HomeTab({
 
   return (
     <div className="flex-1 overflow-y-auto pb-24">
+      {/* FAB Ajouter */}
+      <button
+        onClick={onGoToSearch}
+        className="fixed bottom-24 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600 shadow-xl transition hover:bg-indigo-500 active:scale-95"
+        aria-label="Ajouter un livre"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-6 w-6 text-white">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+        </svg>
+      </button>
       <div className="space-y-6 px-4 pt-4 sm:px-6">
         {/* Résumé cards */}
         <div className="grid grid-cols-2 gap-3">
