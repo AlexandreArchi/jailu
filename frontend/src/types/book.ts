@@ -19,6 +19,7 @@ export interface BookResult {
   description: string | null
   cover_url: string
   thumbnail_url: string | null
+  categories: string[]
 }
 
 export interface UserBook {
@@ -39,6 +40,8 @@ export interface UserBook {
   rating: number | null
   notes: string | null
   tags: string[]
+  startedAt: Date | null
+  finishedAt: Date | null
   createdAt: Date
   updatedAt: Date
 }

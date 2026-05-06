@@ -10,16 +10,9 @@ interface BookDetailModalProps {
 
 const STATUSES: BookStatus[] = ['read', 'reading', 'to_read']
 
-function StarRating({
-  value,
-  onChange,
-}: {
-  value: number | null
-  onChange: (v: number | null) => void
-}) {
+function StarRating({ value, onChange }: { value: number | null; onChange: (v: number | null) => void }) {
   const [hovered, setHovered] = useState<number | null>(null)
   const display = hovered ?? value ?? 0
-
   return (
     <div className="flex gap-1">
       {[1, 2, 3, 4, 5].map((star) => (
@@ -38,6 +31,17 @@ function StarRating({
   )
 }
 
+function formatDate(d: Date | null): string | null {
+  if (!d) return null
+  return new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+function readingDays(start: Date | null, end: Date | null): number | null {
+  if (!start || !end) return null
+  const diff = new Date(end).getTime() - new Date(start).getTime()
+  return Math.max(1, Math.round(diff / (1000 * 60 * 60 * 24)))
+}
+
 export default function BookDetailModal({ book, onClose, onUpdated }: BookDetailModalProps) {
   const [status, setStatus] = useState<BookStatus>(book.status)
   const [rating, setRating] = useState<number | null>(book.rating)
@@ -54,22 +58,25 @@ export default function BookDetailModal({ book, onClose, onUpdated }: BookDetail
 
   const handleSave = async () => {
     setIsSaving(true)
-    await updateBook(book.id, { status, rating, notes: notes.trim() || null })
+    const extra: { startedAt?: Date | null; finishedAt?: Date | null } = {}
+    if (status === 'reading' && !book.startedAt) extra.startedAt = new Date()
+    if (status === 'read' && !book.finishedAt) extra.finishedAt = new Date()
+    if (status === 'read' && !book.startedAt && !book.startedAt) extra.startedAt = book.startedAt
+    await updateBook(book.id, { status, rating, notes: notes.trim() || null, ...extra })
     setIsSaving(false)
     onUpdated()
     onClose()
   }
 
   const handleDelete = async () => {
-    if (!confirmDelete) {
-      setConfirmDelete(true)
-      return
-    }
+    if (!confirmDelete) { setConfirmDelete(true); return }
     setIsDeleting(true)
     await deleteBook(book.id)
     onUpdated()
     onClose()
   }
+
+  const days = readingDays(book.startedAt, book.finishedAt)
 
   return (
     <div
@@ -80,46 +87,67 @@ export default function BookDetailModal({ book, onClose, onUpdated }: BookDetail
         className="w-full max-w-sm rounded-t-2xl bg-slate-800 sm:rounded-2xl overflow-hidden max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* En-tête livre */}
         <div className="flex gap-3 bg-slate-700 p-4">
           {coverSrc && (
             <img
               src={coverSrc}
               alt={book.title}
               className="h-20 w-14 rounded-md object-cover shrink-0"
-              onError={() => {
-                if (coverSrc !== fallbackSrc && fallbackSrc) setCoverSrc(fallbackSrc)
-                else setCoverSrc('')
-              }}
+              onError={() => { if (coverSrc !== fallbackSrc && fallbackSrc) setCoverSrc(fallbackSrc); else setCoverSrc('') }}
             />
           )}
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="font-semibold text-white leading-tight">{book.title}</p>
             <p className="mt-0.5 text-sm text-slate-400">
-              {book.authors.join(', ')}
-              {year ? ` · ${year}` : ''}
+              {book.authors.join(', ')}{year ? ` · ${year}` : ''}
             </p>
             {book.pageCount && (
               <p className="mt-0.5 text-xs text-slate-500">{book.pageCount} pages</p>
+            )}
+            {book.tags.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {book.tags.slice(0, 3).map((tag) => (
+                  <span key={tag} className="rounded-full bg-slate-600/60 px-2 py-0.5 text-[10px] text-slate-300">
+                    {tag}
+                  </span>
+                ))}
+              </div>
             )}
           </div>
         </div>
 
         <div className="space-y-5 p-4 overflow-y-auto">
+          {/* Dates de lecture */}
+          {(book.startedAt || book.finishedAt) && (
+            <div className="rounded-xl bg-slate-700/50 px-3 py-2.5 space-y-1">
+              {book.startedAt && (
+                <p className="text-xs text-slate-400">
+                  <span className="text-slate-500">Commencé le </span>
+                  {formatDate(book.startedAt)}
+                </p>
+              )}
+              {book.finishedAt && (
+                <p className="text-xs text-slate-400">
+                  <span className="text-slate-500">Terminé le </span>
+                  {formatDate(book.finishedAt)}
+                </p>
+              )}
+              {days !== null && (
+                <p className="text-xs font-medium text-indigo-400">{days} jour{days > 1 ? 's' : ''} de lecture</p>
+              )}
+            </div>
+          )}
+
           {/* Statut */}
           <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">
-              Statut
-            </p>
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Statut</p>
             <div className="flex gap-2">
               {STATUSES.map((s) => (
                 <button
                   key={s}
                   onClick={() => setStatus(s)}
                   className={`flex-1 rounded-lg py-2 text-sm font-medium transition ${
-                    status === s
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    status === s ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                   }`}
                 >
                   {BOOK_STATUS_LABELS[s]}
@@ -130,26 +158,19 @@ export default function BookDetailModal({ book, onClose, onUpdated }: BookDetail
 
           {/* Note */}
           <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">
-              Note
-            </p>
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Note</p>
             <StarRating value={rating} onChange={setRating} />
           </div>
 
           {/* Synopsis */}
           {book.description && (
             <div>
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">
-                Synopsis
-              </p>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Synopsis</p>
               <p className={`text-sm text-slate-300 leading-relaxed ${showFullDesc ? '' : 'line-clamp-3'}`}>
                 {book.description}
               </p>
               {book.description.length > 150 && (
-                <button
-                  onClick={() => setShowFullDesc(!showFullDesc)}
-                  className="mt-1 text-xs text-indigo-400 hover:text-indigo-300"
-                >
+                <button onClick={() => setShowFullDesc(!showFullDesc)} className="mt-1 text-xs text-indigo-400 hover:text-indigo-300">
                   {showFullDesc ? 'Voir moins' : 'Voir plus'}
                 </button>
               )}
@@ -158,9 +179,7 @@ export default function BookDetailModal({ book, onClose, onUpdated }: BookDetail
 
           {/* Notes texte */}
           <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">
-              Notes personnelles
-            </p>
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Notes personnelles</p>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
@@ -170,7 +189,6 @@ export default function BookDetailModal({ book, onClose, onUpdated }: BookDetail
             />
           </div>
 
-          {/* Actions */}
           <button
             onClick={handleSave}
             disabled={isSaving}
@@ -183,9 +201,7 @@ export default function BookDetailModal({ book, onClose, onUpdated }: BookDetail
             onClick={handleDelete}
             disabled={isDeleting}
             className={`w-full rounded-xl py-3 text-sm font-medium transition ${
-              confirmDelete
-                ? 'bg-red-600 text-white hover:bg-red-500'
-                : 'text-red-400 hover:text-red-300'
+              confirmDelete ? 'bg-red-600 text-white hover:bg-red-500' : 'text-red-400 hover:text-red-300'
             }`}
           >
             {isDeleting ? 'Suppression...' : confirmDelete ? 'Confirmer la suppression' : 'Supprimer ce livre'}

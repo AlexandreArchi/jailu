@@ -36,11 +36,12 @@ function TopCover({ book, onClick }: { book: UserBook; onClick: () => void }) {
 }
 
 export default function StatsScreen({ books, onClose, onBookClick }: StatsScreenProps) {
+  const bookDate = (b: UserBook) =>
+    b.finishedAt ? new Date(b.finishedAt) : b.createdAt ? new Date(b.createdAt) : null
+
   const availableYears = useMemo(() => {
     const years = new Set(
-      books
-        .filter((b) => b.createdAt)
-        .map((b) => new Date(b.createdAt).getFullYear()),
+      books.map((b) => bookDate(b)?.getFullYear()).filter((y): y is number => y !== undefined),
     )
     return Array.from(years).sort((a, b) => b - a)
   }, [books])
@@ -51,9 +52,7 @@ export default function StatsScreen({ books, onClose, onBookClick }: StatsScreen
     () =>
       selectedYear === null
         ? books
-        : books.filter(
-            (b) => b.createdAt && new Date(b.createdAt).getFullYear() === selectedYear,
-          ),
+        : books.filter((b) => bookDate(b)?.getFullYear() === selectedYear),
     [books, selectedYear],
   )
 

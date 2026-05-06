@@ -68,7 +68,7 @@ export default function ReadTab({ books, onBookClick, onShowStats }: ReadTabProp
 
     const map = new Map<string, UserBook[]>()
     for (const book of filtered) {
-      const date = book.createdAt ? new Date(book.createdAt) : new Date()
+      const date = book.finishedAt ? new Date(book.finishedAt) : book.createdAt ? new Date(book.createdAt) : new Date()
       const key = date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
       if (!map.has(key)) map.set(key, [])
       map.get(key)!.push(book)

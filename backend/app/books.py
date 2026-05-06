@@ -24,6 +24,7 @@ class BookResult(BaseModel):
     description: str | None
     cover_url: str
     thumbnail_url: str | None
+    categories: list[str]
 
 
 def _extract_isbn(identifiers: list[dict]) -> tuple[str | None, str | None]:
@@ -61,6 +62,7 @@ def _parse_volume(item: dict) -> BookResult | None:
         description=info.get('description'),
         cover_url=cover_url,
         thumbnail_url=thumbnail,
+        categories=info.get('categories', []),
     )
 
 
