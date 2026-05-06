@@ -47,6 +47,9 @@ export default function BookDetailModal({ book, onClose, onUpdated }: BookDetail
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const year = book.publishedDate?.split('-')[0]
+  const toHttps = (url: string) => url.replace('http://', 'https://')
+  const [coverSrc, setCoverSrc] = useState(toHttps(book.coverUrl))
+  const fallbackSrc = toHttps(book.thumbnailUrl ?? '')
 
   const handleSave = async () => {
     setIsSaving(true)
@@ -78,11 +81,15 @@ export default function BookDetailModal({ book, onClose, onUpdated }: BookDetail
       >
         {/* En-tête livre */}
         <div className="flex gap-3 bg-slate-700 p-4">
-          {book.coverUrl && (
+          {coverSrc && (
             <img
-              src={book.coverUrl}
+              src={coverSrc}
               alt={book.title}
               className="h-20 w-14 rounded-md object-cover shrink-0"
+              onError={() => {
+                if (coverSrc !== fallbackSrc && fallbackSrc) setCoverSrc(fallbackSrc)
+                else setCoverSrc('')
+              }}
             />
           )}
           <div className="min-w-0">
