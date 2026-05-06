@@ -70,7 +70,6 @@ export default function LibraryPage({ user }: LibraryPageProps) {
             onBookClick={handleBookClick}
             onGoToTab={(tab) => setActiveTab(tab)}
             onShowStats={() => setShowStats(true)}
-            onSignOut={() => void signOut(auth)}
           />
         )}
         {activeTab === 'to_read' && (

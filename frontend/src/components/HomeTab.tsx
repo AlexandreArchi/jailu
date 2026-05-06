@@ -8,7 +8,6 @@ interface HomeTabProps {
   onBookClick: (book: UserBook) => void
   onGoToTab: (tab: 'to_read' | 'read') => void
   onShowStats: () => void
-  onSignOut: () => void
 }
 
 function CoverThumb({
@@ -59,7 +58,6 @@ export default function HomeTab({
   onBookClick,
   onGoToTab,
   onShowStats,
-  onSignOut,
 }: HomeTabProps) {
   const toRead = books.filter((b) => b.status === 'to_read')
   const reading = books.filter((b) => b.status === 'reading')
