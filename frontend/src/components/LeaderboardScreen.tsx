@@ -162,7 +162,7 @@ export default function LeaderboardScreen({ myProfile, friends, onClose, onFrien
           </div>
 
           {/* Year filter */}
-          {availableYears.length > 1 && (
+          {availableYears.length > 0 && (
             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
               <button
                 onClick={() => setSelectedYear(null)}
