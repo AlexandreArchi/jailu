@@ -66,5 +66,4 @@ jobs:
 
       - name: Déploiement Firebase Hosting
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        working-directory: infra
         run: firebase deploy --only hosting --project ${{ secrets.GCP_PROJECT_ID }}
