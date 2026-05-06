@@ -5,6 +5,7 @@ import type { BookResult, BookStatus } from '../types/book'
 import SearchBar from './SearchBar'
 import SearchResults from './SearchResults'
 import AddBookModal from './AddBookModal'
+import ManualAddModal from './ManualAddModal'
 import ScanModal from './ScanModal'
 
 interface SearchTabProps {
@@ -20,6 +21,7 @@ export default function SearchTab({ onBookAdded }: SearchTabProps) {
   const [isAdding, setIsAdding] = useState(false)
   const [showScan, setShowScan] = useState(false)
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set())
+  const [showManual, setShowManual] = useState(false)
 
   const runSearch = useCallback(async (q: string) => {
     setQuery(q)
@@ -62,6 +64,16 @@ export default function SearchTab({ onBookAdded }: SearchTabProps) {
       <div className="px-4 pt-4 pb-3 sm:px-6">
         <div className="mb-3 flex items-center justify-between">
           <h1 className="text-lg font-bold text-white">Ajouter un livre</h1>
+          <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowManual(true)}
+            className="flex items-center gap-1.5 rounded-xl bg-slate-800 px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-700 hover:text-white"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" />
+            </svg>
+            Manuel
+          </button>
           <button
             onClick={() => setShowScan(true)}
             className="flex items-center gap-1.5 rounded-xl bg-slate-800 px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-700 hover:text-white"
@@ -72,6 +84,7 @@ export default function SearchTab({ onBookAdded }: SearchTabProps) {
             </svg>
             Scanner
           </button>
+          </div>
         </div>
         <SearchBar onSearch={runSearch} isLoading={isSearching} />
         {searchError && <p className="mt-2 text-sm text-red-400">{searchError}</p>}
@@ -100,6 +113,12 @@ export default function SearchTab({ onBookAdded }: SearchTabProps) {
       )}
 
       {showScan && <ScanModal onScan={handleScan} onClose={() => setShowScan(false)} />}
+      {showManual && (
+        <ManualAddModal
+          onAdded={() => { onBookAdded(); setShowManual(false) }}
+          onClose={() => setShowManual(false)}
+        />
+      )}
     </div>
   )
 }

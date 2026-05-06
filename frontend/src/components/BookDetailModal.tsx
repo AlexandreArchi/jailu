@@ -1,5 +1,7 @@
-import { useState } from 'react'
-import { updateBook, deleteBook } from '../lib/firestore'
+import { useRef, useState } from 'react'
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { storage, auth } from '../lib/firebase'
+import { updateBook, deleteBook, updateBookCover } from '../lib/firestore'
 import { BOOK_STATUS_LABELS, type BookStatus, type UserBook } from '../types/book'
 
 interface BookDetailModalProps {
@@ -79,6 +81,23 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
   const [isDeleting, setIsDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [showFullDesc, setShowFullDesc] = useState(false)
+  const [isUploadingCover, setIsUploadingCover] = useState(false)
+  const coverFileRef = useRef<HTMLInputElement>(null)
+
+  const handleCoverUpload = async (file: File) => {
+    const userId = auth.currentUser?.uid
+    if (!userId) return
+    setIsUploadingCover(true)
+    try {
+      const storageRef = ref(storage, `bookCovers/${userId}/${Date.now()}`)
+      await uploadBytes(storageRef, file)
+      const url = await getDownloadURL(storageRef)
+      await updateBookCover(book.id, url)
+      setCoverSrc(url)
+    } finally {
+      setIsUploadingCover(false)
+    }
+  }
 
   const year = book.publishedDate?.split('-')[0]
   const toHttps = (url: string) => url.replace('http://', 'https://')
@@ -134,14 +153,54 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
           </button>
         </div>
         <div className="flex gap-3 bg-slate-700 p-4">
-          {coverSrc && (
-            <img
-              src={coverSrc}
-              alt={book.title}
-              className="h-20 w-14 rounded-md object-cover shrink-0"
-              onError={() => { if (coverSrc !== fallbackSrc && fallbackSrc) setCoverSrc(fallbackSrc); else setCoverSrc('') }}
+          {/* Cover — cliquable pour changer/ajouter si pas readOnly */}
+          <div className="relative shrink-0">
+            {coverSrc ? (
+              <img
+                src={coverSrc}
+                alt={book.title}
+                className="h-20 w-14 rounded-md object-cover"
+                onError={() => { if (coverSrc !== fallbackSrc && fallbackSrc) setCoverSrc(fallbackSrc); else setCoverSrc('') }}
+              />
+            ) : (
+              !readOnly && (
+                <button
+                  type="button"
+                  onClick={() => coverFileRef.current?.click()}
+                  className="flex h-20 w-14 flex-col items-center justify-center gap-1 rounded-md bg-slate-600 ring-1 ring-dashed ring-slate-500 hover:ring-indigo-400 transition text-slate-400"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="h-5 w-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                  </svg>
+                  <span className="text-[9px] text-center leading-tight px-0.5">Ajouter</span>
+                </button>
+              )
+            )}
+            {!readOnly && coverSrc && (
+              <button
+                type="button"
+                onClick={() => coverFileRef.current?.click()}
+                disabled={isUploadingCover}
+                className="absolute bottom-0 right-0 flex h-5 w-5 items-center justify-center rounded-full bg-slate-900/80 text-slate-300 hover:text-white transition"
+                aria-label="Changer la couverture"
+              >
+                {isUploadingCover ? (
+                  <div className="h-2.5 w-2.5 animate-spin rounded-full border border-slate-400 border-t-white" />
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-3 w-3">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                  </svg>
+                )}
+              </button>
+            )}
+            <input
+              ref={coverFileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleCoverUpload(f) }}
             />
-          )}
+          </div>
           <div className="min-w-0 flex-1">
 
             <p className="font-semibold text-white leading-tight">{book.title}</p>

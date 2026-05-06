@@ -89,6 +89,47 @@ export async function addBook(book: BookResult, status: BookStatus, finishedAt?:
   return docRef.id
 }
 
+export async function addManualBook(
+  info: { title: string; authors: string[]; coverUrl: string },
+  status: BookStatus,
+  finishedAt?: Date,
+): Promise<string> {
+  const userId = auth.currentUser?.uid
+  if (!userId) throw new Error('Non authentifié')
+  const now = serverTimestamp()
+  const booksRef = collection(db, 'users', userId, 'books')
+  const docRef = await addDoc(booksRef, {
+    googleBooksId: null,
+    isbn13: null,
+    isbn10: null,
+    title: info.title,
+    subtitle: null,
+    authors: info.authors,
+    publisher: null,
+    publishedDate: null,
+    pageCount: null,
+    description: null,
+    coverUrl: info.coverUrl,
+    thumbnailUrl: null,
+    tags: [],
+    status,
+    rating: null,
+    notes: null,
+    startedAt: status === 'reading' ? now : null,
+    finishedAt: status === 'read' ? (finishedAt ?? now) : null,
+    createdAt: now,
+    updatedAt: now,
+  })
+  return docRef.id
+}
+
+export async function updateBookCover(bookId: string, coverUrl: string): Promise<void> {
+  const userId = auth.currentUser?.uid
+  if (!userId) throw new Error('Non authentifié')
+  const bookRef = doc(db, 'users', userId, 'books', bookId)
+  await updateDoc(bookRef, { coverUrl, updatedAt: serverTimestamp() })
+}
+
 export async function getUserBooks(): Promise<UserBook[]> {
   const userId = auth.currentUser?.uid
   if (!userId) throw new Error('Non authentifié')
