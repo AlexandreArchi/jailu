@@ -80,8 +80,11 @@ export default function FriendLibraryScreen({ friend, onClose }: Props) {
     ? (ratedBooks.reduce((s, b) => s + (b.rating ?? 0), 0) / ratedBooks.length).toFixed(1)
     : null
 
+  const sortedRead = [...read].sort((a, b) =>
+    (b.finishedAt ?? b.createdAt).getTime() - (a.finishedAt ?? a.createdAt).getTime()
+  )
   const grouped: { label: string; items: UserBook[] }[] = []
-  for (const book of read) {
+  for (const book of sortedRead) {
     const date = book.finishedAt ? new Date(book.finishedAt) : new Date(book.createdAt)
     const key = date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
     const existing = grouped.find((g) => g.label === key)

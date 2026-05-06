@@ -77,7 +77,9 @@ export default function HomeTab({ books, isLoading, displayName, onBookClick, on
   const toRead = books.filter((b) => b.status === 'to_read')
   const reading = books.filter((b) => b.status === 'reading')
   const read = books.filter((b) => b.status === 'read')
-  const lastRead = read.slice(0, 4)
+  const lastRead = [...read]
+    .sort((a, b) => (b.finishedAt ?? b.createdAt).getTime() - (a.finishedAt ?? a.createdAt).getTime())
+    .slice(0, 4)
 
   if (isLoading) {
     return (

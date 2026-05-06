@@ -66,9 +66,15 @@ export default function ReadTab({ books, onBookClick, onShowStats }: ReadTabProp
       return b.title.toLowerCase().includes(q) || b.authors.some((a) => a.toLowerCase().includes(q))
     })
 
+    const sorted = [...filtered].sort((a, b) => {
+      const da = (a.finishedAt ?? a.createdAt).getTime()
+      const db = (b.finishedAt ?? b.createdAt).getTime()
+      return db - da
+    })
+
     const map = new Map<string, UserBook[]>()
-    for (const book of filtered) {
-      const date = book.finishedAt ? new Date(book.finishedAt) : book.createdAt ? new Date(book.createdAt) : new Date()
+    for (const book of sorted) {
+      const date = book.finishedAt ? new Date(book.finishedAt) : new Date(book.createdAt)
       const key = date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
       if (!map.has(key)) map.set(key, [])
       map.get(key)!.push(book)
