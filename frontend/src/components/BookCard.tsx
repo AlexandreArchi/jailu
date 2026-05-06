@@ -22,8 +22,9 @@ interface BookCardLibraryProps {
 type BookCardProps = BookCardResultProps | BookCardLibraryProps
 
 export default function BookCard(props: BookCardProps) {
-  const coverSrc = props.variant === 'result' ? props.book.cover_url : props.book.coverUrl
-  const fallbackSrc = props.variant === 'result' ? (props.book.thumbnail_url ?? '') : ''
+  const toHttps = (url: string) => url.replace('http://', 'https://')
+  const coverSrc = toHttps(props.variant === 'result' ? props.book.cover_url : props.book.coverUrl)
+  const fallbackSrc = props.variant === 'result' ? toHttps(props.book.thumbnail_url ?? '') : ''
   const [imgSrc, setImgSrc] = useState(coverSrc)
 
   const title = props.book.title

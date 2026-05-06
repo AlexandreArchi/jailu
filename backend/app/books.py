@@ -44,6 +44,8 @@ def _parse_volume(item: dict) -> BookResult | None:
     identifiers = info.get('industryIdentifiers', [])
     isbn13, isbn10 = _extract_isbn(identifiers)
     thumbnail = info.get('imageLinks', {}).get('thumbnail')
+    if thumbnail:
+        thumbnail = thumbnail.replace('http://', 'https://')
     cover_url = _build_cover_url(isbn13, isbn10, thumbnail)
 
     return BookResult(
