@@ -166,7 +166,7 @@ export default function HomeTab({ books, isLoading, displayName, onBookClick, on
         {/* À lire */}
         {toRead.length > 0 && (
           <section>
-            <SectionHeader label="À lire" onAction={() => onGoToTab('to_read')} actionLabel="Tout voir" />
+            <SectionHeader label="À lire" count={toRead.length} onAction={() => onGoToTab('to_read')} actionLabel="Tout voir" />
             <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
               {toRead.slice(0, 12).map((book) => (
                 <CoverCard key={book.id} book={book} onClick={() => onBookClick(book)} />
