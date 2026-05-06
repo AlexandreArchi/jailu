@@ -14,22 +14,11 @@ configure_logging(settings.environment)
 logger = logging.getLogger(__name__)
 
 
-def _load_secret(project_id: str, secret_name: str) -> str:
-    from google.cloud import secretmanager
-    client = secretmanager.SecretManagerServiceClient()
-    name = f'projects/{project_id}/secrets/{secret_name}/versions/latest'
-    response = client.access_secret_version(request={'name': name})
-    return response.payload.data.decode('utf-8')
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info('Démarrage JAILU API version=%s env=%s', settings.version, settings.environment)
-
-    if settings.environment == 'production':
-        settings.google_books_api_key = _load_secret(settings.gcp_project_id, 'GOOGLE_BOOKS_API_KEY')
-        logger.info('Clé Google Books chargée depuis Secret Manager')
-
+    if not settings.google_books_api_key:
+        logger.warning('GOOGLE_BOOKS_API_KEY non configurée — endpoint /api/books/search indisponible')
     yield
     logger.info('Arrêt JAILU API')
 
