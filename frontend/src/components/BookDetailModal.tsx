@@ -45,6 +45,7 @@ export default function BookDetailModal({ book, onClose, onUpdated }: BookDetail
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [showFullDesc, setShowFullDesc] = useState(false)
 
   const year = book.publishedDate?.split('-')[0]
   const toHttps = (url: string) => url.replace('http://', 'https://')
@@ -76,7 +77,7 @@ export default function BookDetailModal({ book, onClose, onUpdated }: BookDetail
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm rounded-t-2xl bg-slate-800 sm:rounded-2xl overflow-hidden"
+        className="w-full max-w-sm rounded-t-2xl bg-slate-800 sm:rounded-2xl overflow-hidden max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* En-tête livre */}
@@ -104,7 +105,7 @@ export default function BookDetailModal({ book, onClose, onUpdated }: BookDetail
           </div>
         </div>
 
-        <div className="space-y-5 p-4">
+        <div className="space-y-5 p-4 overflow-y-auto">
           {/* Statut */}
           <div>
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">
@@ -134,6 +135,26 @@ export default function BookDetailModal({ book, onClose, onUpdated }: BookDetail
             </p>
             <StarRating value={rating} onChange={setRating} />
           </div>
+
+          {/* Synopsis */}
+          {book.description && (
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">
+                Synopsis
+              </p>
+              <p className={`text-sm text-slate-300 leading-relaxed ${showFullDesc ? '' : 'line-clamp-3'}`}>
+                {book.description}
+              </p>
+              {book.description.length > 150 && (
+                <button
+                  onClick={() => setShowFullDesc(!showFullDesc)}
+                  className="mt-1 text-xs text-indigo-400 hover:text-indigo-300"
+                >
+                  {showFullDesc ? 'Voir moins' : 'Voir plus'}
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Notes texte */}
           <div>
