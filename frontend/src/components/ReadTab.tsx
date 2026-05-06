@@ -1,7 +1,9 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
 import type { UserBook } from '../types/book'
+import { coverPalette } from '../lib/coverColor'
 
 type SortKey = 'date' | 'rating' | 'title' | 'author'
+type ViewMode = 'list' | 'grid'
 
 const SORT_OPTIONS: { key: SortKey; icon: string; label: string; shortLabel: string }[] = [
   { key: 'date',   icon: '📅', label: 'Date récente',  shortLabel: 'Date'   },
@@ -33,8 +35,11 @@ function BookRow({ book, onClick }: { book: UserBook; onClick: () => void }) {
           <img src={src} alt={book.title} className="h-full w-full object-cover"
             onError={() => { if (src !== fallback && fallback) setSrc(fallback); else setSrc('') }} />
         ) : (
-          <div className="flex h-full items-center justify-center text-[8px] text-slate-600 px-0.5 text-center">
-            {book.title}
+          <div className="flex h-full w-full items-center justify-center"
+            style={{ background: coverPalette(book.title).bg }}>
+            <span className="text-2xl font-bold opacity-70" style={{ color: coverPalette(book.title).fg }}>
+              {book.title[0]?.toUpperCase()}
+            </span>
           </div>
         )}
       </div>
@@ -62,9 +67,42 @@ function BookRow({ book, onClick }: { book: UserBook; onClick: () => void }) {
   )
 }
 
+function GridCard({ book, onClick }: { book: UserBook; onClick: () => void }) {
+  const toHttps = (url: string) => url.replace('http://', 'https://')
+  const [src, setSrc] = useState(toHttps(book.thumbnailUrl ?? book.coverUrl))
+  const fallback = toHttps(book.thumbnailUrl ? book.coverUrl : '')
+  const palette = coverPalette(book.title)
+
+  return (
+    <button
+      onClick={onClick}
+      className="relative overflow-hidden rounded-xl bg-slate-800 shadow-md active:scale-95 transition-transform duration-150"
+      style={{ aspectRatio: '2/3' }}
+    >
+      {src ? (
+        <img src={src} alt={book.title} className="h-full w-full object-cover"
+          onError={() => { if (src !== fallback && fallback) setSrc(fallback); else setSrc('') }} />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center" style={{ background: palette.bg }}>
+          <span className="text-3xl font-bold opacity-70" style={{ color: palette.fg }}>
+            {book.title[0]?.toUpperCase()}
+          </span>
+        </div>
+      )}
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent px-1.5 pb-1.5 pt-6">
+        <p className="text-[9px] font-semibold text-white leading-tight line-clamp-2">{book.title}</p>
+        {book.rating !== null && (
+          <p className="text-[8px] text-amber-400 mt-0.5">{'★'.repeat(Math.floor(book.rating))}</p>
+        )}
+      </div>
+    </button>
+  )
+}
+
 export default function ReadTab({ books, onBookClick, onShowStats }: ReadTabProps) {
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortKey>('date')
+  const [view, setView] = useState<ViewMode>('list')
   const [showSort, setShowSort] = useState(false)
   const sortRef = useRef<HTMLDivElement>(null)
 
@@ -163,6 +201,23 @@ export default function ReadTab({ books, onBookClick, onShowStats }: ReadTabProp
               )}
             </div>
 
+            {/* View toggle */}
+            <button
+              onClick={() => setView((v) => v === 'list' ? 'grid' : 'list')}
+              className="flex items-center justify-center h-9 w-9 rounded-xl bg-slate-800 text-slate-400 transition hover:text-white"
+              aria-label={view === 'list' ? 'Vue grille' : 'Vue liste'}
+            >
+              {view === 'list' ? (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                </svg>
+              )}
+            </button>
+
             {/* Stats button */}
             <button
               onClick={onShowStats}
@@ -202,6 +257,12 @@ export default function ReadTab({ books, onBookClick, onShowStats }: ReadTabProp
           <p className="py-12 text-center text-sm text-slate-600">
             {total === 0 ? "Aucun livre lu pour l'instant." : 'Aucun résultat'}
           </p>
+        ) : view === 'grid' ? (
+          <div className="grid grid-cols-3 gap-2 px-4 py-2 sm:grid-cols-4">
+            {grouped.flatMap(({ items }) => items).map((book) => (
+              <GridCard key={book.id} book={book} onClick={() => onBookClick(book)} />
+            ))}
+          </div>
         ) : (
           grouped.map(({ label, items }) => (
             <div key={label ?? '_flat'}>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getFriendBooks } from '../lib/firestore'
 import type { FriendEntry, UserBook } from '../types/book'
 import BookDetailModal from './BookDetailModal'
+import { coverPalette } from '../lib/coverColor'
 
 interface Props {
   friend: FriendEntry
@@ -21,7 +22,9 @@ function CoverItem({ book, onClick }: { book: UserBook; onClick: () => void }) {
           <img src={src} alt={book.title} className="h-full w-full object-cover"
             onError={() => { if (src !== fallback && fallback) setSrc(fallback); else setSrc('') }} />
         ) : (
-          <div className="flex h-full items-center justify-center text-[8px] text-slate-600 px-0.5 text-center">{book.title}</div>
+          <div className="flex h-full w-full items-center justify-center" style={{ background: coverPalette(book.title).bg }}>
+            <span className="text-xl font-bold opacity-70" style={{ color: coverPalette(book.title).fg }}>{book.title[0]?.toUpperCase()}</span>
+          </div>
         )}
       </div>
       <div className="min-w-0 flex-1">

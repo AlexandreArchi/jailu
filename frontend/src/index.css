@@ -4,7 +4,24 @@
   0% { top: 0; }
   100% { top: calc(100% - 2px); }
 }
-
 .animate-scan {
   animation: scan 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes tab-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-tab-enter {
+  animation: tab-enter 200ms ease-out both;
+}
+
+@keyframes pulse-skeleton {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1; }
+}
+.skeleton {
+  background: #1e293b;
+  border-radius: 0.75rem;
+  animation: pulse-skeleton 1.4s ease-in-out infinite;
 }

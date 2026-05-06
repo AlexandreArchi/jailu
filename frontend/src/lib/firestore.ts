@@ -46,6 +46,7 @@ function docToUserBook(docSnap: { id: string; data: () => Record<string, unknown
     status: d.status as BookStatus,
     rating: d.rating as number | null,
     notes: d.notes as string | null,
+    quotes: (d.quotes as string[]) ?? [],
     startedAt: toDate(d.startedAt),
     finishedAt: toDate(d.finishedAt),
     createdAt: toDate(d.createdAt) ?? new Date(),
@@ -78,6 +79,7 @@ export async function addBook(book: BookResult, status: BookStatus, finishedAt?:
     status,
     rating: null,
     notes: null,
+    quotes: [],
     startedAt: status === 'reading' ? now : null,
     finishedAt: status === 'read' ? (finishedAt ?? now) : null,
     createdAt: now,
@@ -112,6 +114,7 @@ export async function addManualBook(
     status,
     rating: null,
     notes: null,
+    quotes: [],
     startedAt: status === 'reading' ? now : null,
     finishedAt: status === 'read' ? (finishedAt ?? now) : null,
     createdAt: now,
@@ -142,6 +145,7 @@ export async function updateBook(
     status?: BookStatus
     rating?: number | null
     notes?: string | null
+    quotes?: string[]
     startedAt?: Date | null
     finishedAt?: Date | null
   },

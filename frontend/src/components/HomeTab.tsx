@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { UserBook } from '../types/book'
 import GoalBanner from './GoalBanner'
+import { coverPalette } from '../lib/coverColor'
 
 interface HomeTabProps {
   books: UserBook[]
@@ -32,8 +33,11 @@ function CoverCard({ book, onClick }: { book: UserBook; onClick: () => void }) {
           onError={() => { if (src !== fallback && fallback) setSrc(fallback); else setSrc('') }}
         />
       ) : (
-        <div className="flex h-full items-center justify-center p-2 text-center text-[9px] text-slate-500 bg-slate-800">
-          {book.title}
+        <div className="flex h-full w-full flex-col items-center justify-center gap-1"
+          style={{ background: coverPalette(book.title).bg }}>
+          <span className="text-4xl font-bold opacity-70" style={{ color: coverPalette(book.title).fg }}>
+            {book.title[0]?.toUpperCase()}
+          </span>
         </div>
       )}
       {/* Gradient overlay with title */}
@@ -86,8 +90,20 @@ export default function HomeTab({ books, isLoading, displayName, onBookClick, on
 
   if (isLoading) {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-700 border-t-indigo-500" />
+      <div className="flex-1 overflow-y-auto pb-28">
+        <div className="space-y-7 px-4 pt-5 sm:px-6">
+          <div className="skeleton h-20 w-full" />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="skeleton h-32" />
+            <div className="skeleton h-32" />
+          </div>
+          <div className="space-y-3">
+            <div className="skeleton h-4 w-24" />
+            <div className="flex gap-3">
+              {[1,2,3].map(i => <div key={i} className="skeleton h-44 w-[104px] shrink-0" />)}
+            </div>
+          </div>
+        </div>
       </div>
     )
   }

@@ -84,6 +84,8 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
   const [showFullDesc, setShowFullDesc] = useState(false)
   const [isUploadingCover, setIsUploadingCover] = useState(false)
   const [showRecommend, setShowRecommend] = useState(false)
+  const [quotes, setQuotes] = useState<string[]>(book.quotes ?? [])
+  const [newQuote, setNewQuote] = useState('')
   const coverFileRef = useRef<HTMLInputElement>(null)
 
   const handleCoverUpload = async (file: File) => {
@@ -118,7 +120,7 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
     // Auto-set si vide et statut cohérent
     if (!startedAt && status === 'reading') extra.startedAt = new Date()
     if (!finishedAt && status === 'read') extra.finishedAt = new Date()
-    await updateBook(book.id, { status, rating, notes: notes.trim() || null, ...extra })
+    await updateBook(book.id, { status, rating, notes: notes.trim() || null, quotes, ...extra })
     if (status === 'read' && book.status !== 'read') {
       void createStory(
         { title: book.title, authors: book.authors, coverUrl: book.coverUrl, thumbnailUrl: book.thumbnailUrl, googleBooksId: book.googleBooksId },
@@ -363,6 +365,62 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
                 placeholder="Tes impressions..."
                 className="w-full resize-none rounded-lg bg-slate-700 px-3 py-2 text-sm text-white placeholder-slate-500 outline-none ring-1 ring-slate-600 focus:ring-indigo-500"
               />
+            )}
+          </div>
+
+          {/* Citations */}
+          <div>
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Citations</p>
+            {quotes.length > 0 && (
+              <div className="mb-3 space-y-2">
+                {quotes.map((q, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <blockquote className="flex-1 border-l-2 border-indigo-500/60 pl-3 text-sm text-slate-300 italic leading-relaxed">
+                      "{q}"
+                    </blockquote>
+                    {!readOnly && (
+                      <button
+                        onClick={() => setQuotes(quotes.filter((_, idx) => idx !== i))}
+                        className="mt-0.5 shrink-0 text-slate-600 hover:text-red-400 transition"
+                        aria-label="Supprimer"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-3.5 w-3.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {!readOnly && (
+              <div className="flex gap-2">
+                <input
+                  value={newQuote}
+                  onChange={(e) => setNewQuote(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newQuote.trim()) {
+                      setQuotes([...quotes, newQuote.trim()])
+                      setNewQuote('')
+                      e.preventDefault()
+                    }
+                  }}
+                  placeholder="Ajouter une citation…"
+                  className="flex-1 rounded-xl bg-slate-700 px-3 py-2 text-sm text-white placeholder-slate-500 outline-none ring-1 ring-slate-600 focus:ring-indigo-500 transition"
+                />
+                <button
+                  onClick={() => { if (newQuote.trim()) { setQuotes([...quotes, newQuote.trim()]); setNewQuote('') } }}
+                  disabled={!newQuote.trim()}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-700 text-slate-400 transition hover:text-white disabled:opacity-40"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-4 w-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                  </svg>
+                </button>
+              </div>
+            )}
+            {readOnly && quotes.length === 0 && (
+              <p className="text-sm text-slate-600 italic">Aucune citation</p>
             )}
           </div>
 

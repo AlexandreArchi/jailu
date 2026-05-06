@@ -85,6 +85,7 @@ export interface UserBook {
   status: BookStatus
   rating: number | null
   notes: string | null
+  quotes: string[]
   tags: string[]
   startedAt: Date | null
   finishedAt: Date | null

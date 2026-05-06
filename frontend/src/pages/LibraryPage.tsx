@@ -93,7 +93,7 @@ export default function LibraryPage({ user }: LibraryPageProps) {
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-lg min-h-0 flex-1 flex-col overflow-hidden">
+      <div key={activeTab} className="animate-tab-enter mx-auto flex w-full max-w-lg min-h-0 flex-1 flex-col overflow-hidden">
         {activeTab === 'home' && (
           <HomeTab
             books={userBooks}

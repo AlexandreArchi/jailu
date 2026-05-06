@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   searchUserByUsername,
   sendFriendRequest,
@@ -32,6 +32,30 @@ type SearchState =
   | { kind: 'not_found' }
   | { kind: 'self' }
   | { kind: 'found'; profile: UserProfile; status: FriendshipStatus }
+
+function SwipeToDelete({ onDelete, children }: { onDelete: () => void; children: React.ReactNode }) {
+  const startX = useRef(0)
+  const [offset, setOffset] = useState(0)
+  const dragging = useRef(false)
+
+  return (
+    <div
+      style={{ transform: `translateX(${offset}px)`, transition: dragging.current ? 'none' : 'transform 250ms ease-out, opacity 250ms', opacity: offset < -120 ? 0 : 1 }}
+      onTouchStart={(e) => { startX.current = e.touches[0].clientX; dragging.current = true }}
+      onTouchMove={(e) => {
+        const dx = startX.current - e.touches[0].clientX
+        if (dx > 0) setOffset(-Math.min(dx, 160))
+      }}
+      onTouchEnd={() => {
+        dragging.current = false
+        if (offset < -80) { setOffset(-400); setTimeout(onDelete, 260) }
+        else setOffset(0)
+      }}
+    >
+      {children}
+    </div>
+  )
+}
 
 export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: Props) {
   const [searchQuery, setSearchQuery] = useState('')
@@ -312,7 +336,8 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
                   {recommendations.map((rec) => {
                     const toHttps = (url: string) => url.replace('http://', 'https://')
                     return (
-                      <div key={rec.id} className="flex items-start gap-3 rounded-2xl bg-slate-800/60 px-4 py-3 ring-1 ring-white/5">
+                      <SwipeToDelete key={rec.id} onDelete={() => void deleteRecommendation(rec.id)}>
+                      <div className="flex items-start gap-3 rounded-2xl bg-slate-800/60 px-4 py-3 ring-1 ring-white/5">
                         <div className="h-14 w-10 shrink-0 overflow-hidden rounded-lg bg-slate-700">
                           <img
                             src={toHttps(rec.bookThumbnailUrl ?? rec.bookCoverUrl)}
@@ -339,6 +364,7 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
                           </svg>
                         </button>
                       </div>
+                      </SwipeToDelete>
                     )
                   })}
                 </div>
