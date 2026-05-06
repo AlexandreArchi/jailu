@@ -43,11 +43,11 @@ export default function SearchTab({ onBookAdded }: SearchTabProps) {
     [runSearch],
   )
 
-  const handleConfirmAdd = async (status: BookStatus) => {
+  const handleConfirmAdd = async (status: BookStatus, finishedAt?: Date) => {
     if (!bookToAdd) return
     setIsAdding(true)
     try {
-      await addBook(bookToAdd, status)
+      await addBook(bookToAdd, status, finishedAt)
       onBookAdded()
       setBookToAdd(null)
       setQuery('')

@@ -58,7 +58,7 @@ function docToUserBook(docSnap: { id: string; data: () => Record<string, unknown
 
 // ── books ─────────────────────────────────────────────────────────────────────
 
-export async function addBook(book: BookResult, status: BookStatus): Promise<string> {
+export async function addBook(book: BookResult, status: BookStatus, finishedAt?: Date): Promise<string> {
   const userId = auth.currentUser?.uid
   if (!userId) throw new Error('Non authentifié')
 
@@ -82,7 +82,7 @@ export async function addBook(book: BookResult, status: BookStatus): Promise<str
     rating: null,
     notes: null,
     startedAt: status === 'reading' ? now : null,
-    finishedAt: status === 'read' ? now : null,
+    finishedAt: status === 'read' ? (finishedAt ?? now) : null,
     createdAt: now,
     updatedAt: now,
   })

@@ -31,6 +31,7 @@ class BookResult(BaseModel):
     cover_url: str
     thumbnail_url: str | None
     categories: list[str]
+    language: str | None
 
 
 def _extract_isbn(identifiers: list[dict]) -> tuple[str | None, str | None]:
@@ -72,11 +73,14 @@ def _parse_volume(item: dict) -> BookResult | None:
         cover_url=cover_url,
         thumbnail_url=thumbnail,
         categories=info.get('categories', []),
+        language=info.get('language'),
     )
 
 
 def _score(book: BookResult) -> int:
     s = 0
+    if book.language == 'fr':
+        s += 12
     if book.isbn13:
         s += 10
     elif book.isbn10:
