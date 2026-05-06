@@ -91,7 +91,14 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
   }
 
   if (showLeaderboard) {
-    return <LeaderboardScreen myProfile={myProfile} friends={friends} onClose={() => setShowLeaderboard(false)} />
+    return (
+      <LeaderboardScreen
+        myProfile={myProfile}
+        friends={friends}
+        onClose={() => setShowLeaderboard(false)}
+        onFriendClick={(friend) => { setShowLeaderboard(false); setViewingFriend(friend) }}
+      />
+    )
   }
 
   if (viewingFriend) {
