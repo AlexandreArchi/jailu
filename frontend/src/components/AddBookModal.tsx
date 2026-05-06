@@ -18,13 +18,24 @@ export default function AddBookModal({ book, onConfirm, onClose }: AddBookModalP
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center"
-      onClick={step === 'choose' ? onClose : undefined}
+      onClick={onClose}
     >
       <div
         className="w-full max-w-sm rounded-t-2xl bg-slate-800 p-6 sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <p className="mb-1 font-semibold text-white">{book.title}</p>
+        <div className="flex items-start justify-between mb-1">
+          <p className="font-semibold text-white pr-3">{book.title}</p>
+          <button
+            onClick={onClose}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-700 text-slate-400 hover:text-white transition"
+            aria-label="Fermer"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
         <p className="mb-6 text-sm text-slate-400">{book.authors.join(', ')}</p>
 
         {step === 'choose' ? (

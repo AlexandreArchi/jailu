@@ -183,13 +183,13 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
                 type="button"
                 onClick={() => coverFileRef.current?.click()}
                 disabled={isUploadingCover}
-                className="absolute bottom-0 right-0 flex h-5 w-5 items-center justify-center rounded-full bg-slate-900/80 text-slate-300 hover:text-white transition"
+                className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full bg-slate-900/90 text-slate-300 hover:text-white transition"
                 aria-label="Changer la couverture"
               >
                 {isUploadingCover ? (
-                  <div className="h-2.5 w-2.5 animate-spin rounded-full border border-slate-400 border-t-white" />
+                  <div className="h-3 w-3 animate-spin rounded-full border border-slate-400 border-t-white" />
                 ) : (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-3 w-3">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-3.5 w-3.5">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
                   </svg>
                 )}
@@ -389,7 +389,7 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
             </>
           )}
           {showRecommend && (
-            <RecommendBookModal book={book} onClose={() => setShowRecommend(false)} />
+            <RecommendBookModal book={book} onClose={() => { setShowRecommend(false); onClose() }} />
           )}
         </div>
       </div>

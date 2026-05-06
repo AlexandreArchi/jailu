@@ -241,7 +241,7 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
                         </div>
                         <button
                           onClick={() => void deleteRecommendation(rec.id)}
-                          className="shrink-0 rounded-lg p-1.5 text-slate-600 hover:text-slate-400 transition"
+                          className="shrink-0 flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 hover:text-slate-400 transition"
                           aria-label="Ignorer"
                         >
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">

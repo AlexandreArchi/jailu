@@ -63,7 +63,19 @@ export default function ManualAddModal({ onAdded, onClose }: Props) {
         className="w-full max-w-sm rounded-t-2xl bg-slate-800 p-6 sm:rounded-2xl max-h-[92vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <p className="mb-5 font-semibold text-white">Ajouter manuellement</p>
+        <div className="flex items-center justify-between mb-5">
+          <p className="font-semibold text-white">Ajouter manuellement</p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-slate-400 hover:text-white transition"
+            aria-label="Fermer"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
 
         {/* Cover upload */}
         <div className="mb-5 flex justify-center">

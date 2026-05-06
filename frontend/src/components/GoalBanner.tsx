@@ -56,7 +56,7 @@ export default function GoalBanner({ readCount, goal, onGoalChange }: GoalBanner
             </p>
             <button
               onClick={openEdit}
-              className="flex items-center justify-center h-7 w-7 rounded-xl bg-slate-700/60 text-slate-400 transition hover:bg-slate-700 hover:text-white"
+              className="flex items-center justify-center h-8 w-8 rounded-xl bg-slate-700/60 text-slate-400 transition hover:bg-slate-700 hover:text-white"
               aria-label="Modifier l'objectif"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-3.5 w-3.5">
@@ -101,12 +101,23 @@ export default function GoalBanner({ readCount, goal, onGoalChange }: GoalBanner
       )}
 
       {showEdit && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60" onClick={() => setShowEdit(false)}>
           <div
             className="w-full max-w-sm rounded-t-2xl bg-slate-800 p-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="mb-5 text-base font-bold text-white">Objectif {currentYear}</h2>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-base font-bold text-white">Objectif {currentYear}</h2>
+              <button
+                onClick={() => setShowEdit(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-slate-400 hover:text-white transition"
+                aria-label="Fermer"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
 
             <label className="mb-1 block text-xs font-medium text-slate-400">
               Nombre de livres à lire
