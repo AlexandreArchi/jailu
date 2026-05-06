@@ -16,17 +16,15 @@ interface BookCardResultProps {
 interface BookCardLibraryProps {
   variant: 'library'
   book: UserBook
+  onClick: (book: UserBook) => void
 }
 
 type BookCardProps = BookCardResultProps | BookCardLibraryProps
 
 export default function BookCard(props: BookCardProps) {
-  const [imgSrc, setImgSrc] = useState(
-    props.variant === 'result' ? props.book.cover_url : props.book.coverUrl,
-  )
-
-  const fallbackSrc =
-    props.variant === 'result' ? (props.book.thumbnail_url ?? '') : props.book.coverUrl
+  const coverSrc = props.variant === 'result' ? props.book.cover_url : props.book.coverUrl
+  const fallbackSrc = props.variant === 'result' ? (props.book.thumbnail_url ?? '') : ''
+  const [imgSrc, setImgSrc] = useState(coverSrc)
 
   const title = props.book.title
   const authors = props.book.authors
@@ -35,8 +33,15 @@ export default function BookCard(props: BookCardProps) {
       ? (props.book.published_date?.split('-')[0] ?? '')
       : (props.book.publishedDate?.split('-')[0] ?? '')
 
+  const handleClick = () => {
+    if (props.variant === 'library') props.onClick(props.book)
+  }
+
   return (
-    <div className="flex gap-3 rounded-xl bg-slate-800 p-3">
+    <div
+      className={`flex gap-3 rounded-xl bg-slate-800 p-3 ${props.variant === 'library' ? 'cursor-pointer transition hover:bg-slate-750 active:bg-slate-700' : ''}`}
+      onClick={handleClick}
+    >
       <div className="relative h-24 w-16 shrink-0 overflow-hidden rounded-md bg-slate-700">
         {imgSrc ? (
           <img
@@ -52,7 +57,7 @@ export default function BookCard(props: BookCardProps) {
             }}
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-slate-500 text-xs text-center px-1">
+          <div className="flex h-full items-center justify-center px-1 text-center text-xs text-slate-500">
             Pas de couverture
           </div>
         )}
@@ -65,18 +70,21 @@ export default function BookCard(props: BookCardProps) {
             {authors.join(', ')}
             {year ? ` · ${year}` : ''}
           </p>
+          {props.variant === 'library' && props.book.rating !== null && (
+            <p className="mt-0.5 text-xs text-amber-400">
+              {'★'.repeat(props.book.rating)}{'☆'.repeat(5 - props.book.rating)}
+            </p>
+          )}
         </div>
 
-        <div className="mt-2 flex items-center justify-between">
+        <div className="mt-2">
           {props.variant === 'library' ? (
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[props.book.status]}`}
-            >
+            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[props.book.status]}`}>
               {BOOK_STATUS_LABELS[props.book.status]}
             </span>
           ) : (
             <button
-              onClick={() => props.onAdd(props.book)}
+              onClick={(e) => { e.stopPropagation(); props.onAdd(props.book) }}
               className="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-medium text-white transition hover:bg-indigo-500"
             >
               Ajouter

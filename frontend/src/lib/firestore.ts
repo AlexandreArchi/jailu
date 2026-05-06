@@ -5,6 +5,7 @@ import {
   addDoc,
   getDocs,
   updateDoc,
+  deleteDoc,
   serverTimestamp,
   query,
   orderBy,
@@ -74,10 +75,21 @@ export async function getUserBooks(): Promise<UserBook[]> {
   })
 }
 
-export async function updateBookStatus(bookId: string, status: BookStatus): Promise<void> {
+export async function updateBook(
+  bookId: string,
+  fields: { status?: BookStatus; rating?: number | null; notes?: string | null },
+): Promise<void> {
   const userId = auth.currentUser?.uid
   if (!userId) throw new Error('Non authentifié')
 
   const bookRef = doc(db, 'users', userId, 'books', bookId)
-  await updateDoc(bookRef, { status, updatedAt: serverTimestamp() })
+  await updateDoc(bookRef, { ...fields, updatedAt: serverTimestamp() })
+}
+
+export async function deleteBook(bookId: string): Promise<void> {
+  const userId = auth.currentUser?.uid
+  if (!userId) throw new Error('Non authentifié')
+
+  const bookRef = doc(db, 'users', userId, 'books', bookId)
+  await deleteDoc(bookRef)
 }
