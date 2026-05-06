@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { signOut } from 'firebase/auth'
 import type { User } from 'firebase/auth'
-import { auth } from '../lib/firebase'
 import { getUserBooks, getMyProfile } from '../lib/firestore'
 import BottomNav from '../components/BottomNav'
 import HomeTab from '../components/HomeTab'
@@ -12,6 +10,7 @@ import FriendsTab from '../components/FriendsTab'
 import BookDetailModal from '../components/BookDetailModal'
 import StatsScreen from '../components/StatsScreen'
 import UsernameSetupModal from '../components/UsernameSetupModal'
+import ProfileModal from '../components/ProfileModal'
 import type { UserBook, UserProfile } from '../types/book'
 
 type Tab = 'home' | 'to_read' | 'read' | 'search' | 'friends'
@@ -28,6 +27,7 @@ export default function LibraryPage({ user }: LibraryPageProps) {
   const [bookToEdit, setBookToEdit] = useState<UserBook | null>(null)
   const [showStats, setShowStats] = useState(false)
   const [pendingFriendsCount, setPendingFriendsCount] = useState(0)
+  const [showProfile, setShowProfile] = useState(false)
 
   useEffect(() => {
     getMyProfile().then(setMyProfile).catch(() => setMyProfile(null))
@@ -70,15 +70,15 @@ export default function LibraryPage({ user }: LibraryPageProps) {
     <div className="flex h-screen flex-col bg-slate-950 text-white">
       <header className="shrink-0 border-b border-slate-800/80 px-4 pt-12 pb-3 sm:pt-6 sm:px-6">
         <div className="mx-auto flex max-w-lg items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xl font-bold tracking-tight text-white">JAILU</span>
-            <span className="text-xs text-slate-500">@{myProfile.username}</span>
-          </div>
+          <span className="text-xl font-bold tracking-tight text-white">JAILU</span>
           <button
-            onClick={() => void signOut(auth)}
-            className="rounded-lg px-3 py-1.5 text-xs text-slate-500 transition hover:text-slate-300"
+            onClick={() => setShowProfile(true)}
+            className="flex items-center gap-2 rounded-xl bg-slate-800/60 px-3 py-1.5 ring-1 ring-white/5 transition hover:bg-slate-800"
           >
-            Déconnexion
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600/30">
+              <span className="text-[10px] font-bold text-indigo-400">{myProfile.username[0].toUpperCase()}</span>
+            </div>
+            <span className="text-xs font-medium text-slate-300">@{myProfile.username}</span>
           </button>
         </div>
       </header>
@@ -130,6 +130,10 @@ export default function LibraryPage({ user }: LibraryPageProps) {
           onClose={() => setBookToEdit(null)}
           onUpdated={() => void loadBooks()}
         />
+      )}
+
+      {showProfile && (
+        <ProfileModal user={user} profile={myProfile} onClose={() => setShowProfile(false)} />
       )}
 
       {showStats && (

@@ -6,6 +6,7 @@ interface BookDetailModalProps {
   book: UserBook
   onClose: () => void
   onUpdated: () => void
+  readOnly?: boolean
 }
 
 const STATUSES: BookStatus[] = ['read', 'reading', 'to_read']
@@ -52,7 +53,7 @@ function readingDays(start: Date | null, end: Date | null): number | null {
   return Math.max(1, Math.round(diff / (1000 * 60 * 60 * 24)))
 }
 
-export default function BookDetailModal({ book, onClose, onUpdated }: BookDetailModalProps) {
+export default function BookDetailModal({ book, onClose, onUpdated, readOnly = false }: BookDetailModalProps) {
   const [status, setStatus] = useState<BookStatus>(book.status)
   const [rating, setRating] = useState<number | null>(book.rating)
   const [notes, setNotes] = useState(book.notes ?? '')
@@ -150,26 +151,39 @@ export default function BookDetailModal({ book, onClose, onUpdated }: BookDetail
           {/* Dates de lecture */}
           <div className="space-y-3">
             <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Dates de lecture</p>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="mb-1 block text-[10px] text-slate-500">Commencé le</label>
-                <input
-                  type="date"
-                  value={startedAtInput}
-                  onChange={(e) => setStartedAtInput(e.target.value)}
-                  className="w-full rounded-lg bg-slate-700 px-2 py-1.5 text-sm text-white outline-none ring-1 ring-slate-600 focus:ring-indigo-500"
-                />
+            {readOnly ? (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-lg bg-slate-700/50 px-3 py-2">
+                  <p className="text-[10px] text-slate-500 mb-0.5">Commencé le</p>
+                  <p className="text-sm text-white">{startedAtInput ? new Date(startedAtInput).toLocaleDateString('fr-FR') : '—'}</p>
+                </div>
+                <div className="rounded-lg bg-slate-700/50 px-3 py-2">
+                  <p className="text-[10px] text-slate-500 mb-0.5">Terminé le</p>
+                  <p className="text-sm text-white">{finishedAtInput ? new Date(finishedAtInput).toLocaleDateString('fr-FR') : '—'}</p>
+                </div>
               </div>
-              <div>
-                <label className="mb-1 block text-[10px] text-slate-500">Terminé le</label>
-                <input
-                  type="date"
-                  value={finishedAtInput}
-                  onChange={(e) => setFinishedAtInput(e.target.value)}
-                  className="w-full rounded-lg bg-slate-700 px-2 py-1.5 text-sm text-white outline-none ring-1 ring-slate-600 focus:ring-indigo-500"
-                />
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="mb-1 block text-[10px] text-slate-500">Commencé le</label>
+                  <input
+                    type="date"
+                    value={startedAtInput}
+                    onChange={(e) => setStartedAtInput(e.target.value)}
+                    className="w-full rounded-lg bg-slate-700 px-2 py-1.5 text-sm text-white outline-none ring-1 ring-slate-600 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[10px] text-slate-500">Terminé le</label>
+                  <input
+                    type="date"
+                    value={finishedAtInput}
+                    onChange={(e) => setFinishedAtInput(e.target.value)}
+                    className="w-full rounded-lg bg-slate-700 px-2 py-1.5 text-sm text-white outline-none ring-1 ring-slate-600 focus:ring-indigo-500"
+                  />
+                </div>
               </div>
-            </div>
+            )}
             {days !== null && (
               <p className="text-xs font-medium text-indigo-400">{days} jour{days > 1 ? 's' : ''} de lecture</p>
             )}
@@ -178,25 +192,42 @@ export default function BookDetailModal({ book, onClose, onUpdated }: BookDetail
           {/* Statut */}
           <div>
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Statut</p>
-            <div className="flex gap-2">
-              {STATUSES.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setStatus(s)}
-                  className={`flex-1 rounded-lg py-2 text-sm font-medium transition ${
-                    status === s ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                  }`}
-                >
-                  {BOOK_STATUS_LABELS[s]}
-                </button>
-              ))}
-            </div>
+            {readOnly ? (
+              <span className="inline-block rounded-lg bg-indigo-600/20 px-3 py-1.5 text-sm font-medium text-indigo-300">
+                {BOOK_STATUS_LABELS[status]}
+              </span>
+            ) : (
+              <div className="flex gap-2">
+                {STATUSES.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setStatus(s)}
+                    className={`flex-1 rounded-lg py-2 text-sm font-medium transition ${
+                      status === s ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    }`}
+                  >
+                    {BOOK_STATUS_LABELS[s]}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Note */}
           <div>
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Note</p>
-            <StarRating value={rating} onChange={setRating} />
+            {readOnly ? (
+              rating !== null ? (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xl text-amber-400">{'★'.repeat(rating)}{'☆'.repeat(5 - rating)}</span>
+                  <span className="text-sm text-slate-400">{rating}/5</span>
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500">Pas encore noté</p>
+              )
+            ) : (
+              <StarRating value={rating} onChange={setRating} />
+            )}
           </div>
 
           {/* Synopsis */}
@@ -217,32 +248,42 @@ export default function BookDetailModal({ book, onClose, onUpdated }: BookDetail
           {/* Notes texte */}
           <div>
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Notes personnelles</p>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-              placeholder="Tes impressions..."
-              className="w-full resize-none rounded-lg bg-slate-700 px-3 py-2 text-sm text-white placeholder-slate-500 outline-none ring-1 ring-slate-600 focus:ring-indigo-500"
-            />
+            {readOnly ? (
+              <p className="text-sm text-slate-300 leading-relaxed">
+                {notes.trim() || <span className="text-slate-500 italic">Aucune note</span>}
+              </p>
+            ) : (
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={3}
+                placeholder="Tes impressions..."
+                className="w-full resize-none rounded-lg bg-slate-700 px-3 py-2 text-sm text-white placeholder-slate-500 outline-none ring-1 ring-slate-600 focus:ring-indigo-500"
+              />
+            )}
           </div>
 
-          <button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="w-full rounded-xl bg-indigo-600 py-3 font-medium text-white transition hover:bg-indigo-500 disabled:opacity-50"
-          >
-            {isSaving ? 'Enregistrement...' : 'Enregistrer'}
-          </button>
+          {!readOnly && (
+            <>
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="w-full rounded-xl bg-indigo-600 py-3 font-medium text-white transition hover:bg-indigo-500 disabled:opacity-50"
+              >
+                {isSaving ? 'Enregistrement...' : 'Enregistrer'}
+              </button>
 
-          <button
-            onClick={handleDelete}
-            disabled={isDeleting}
-            className={`w-full rounded-xl py-3 text-sm font-medium transition ${
-              confirmDelete ? 'bg-red-600 text-white hover:bg-red-500' : 'text-red-400 hover:text-red-300'
-            }`}
-          >
-            {isDeleting ? 'Suppression...' : confirmDelete ? 'Confirmer la suppression' : 'Supprimer ce livre'}
-          </button>
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className={`w-full rounded-xl py-3 text-sm font-medium transition ${
+                  confirmDelete ? 'bg-red-600 text-white hover:bg-red-500' : 'text-red-400 hover:text-red-300'
+                }`}
+              >
+                {isDeleting ? 'Suppression...' : confirmDelete ? 'Confirmer la suppression' : 'Supprimer ce livre'}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

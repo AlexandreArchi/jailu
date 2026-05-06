@@ -1,19 +1,20 @@
 import { useEffect, useState } from 'react'
 import { getFriendBooks } from '../lib/firestore'
 import type { FriendEntry, UserBook } from '../types/book'
+import BookDetailModal from './BookDetailModal'
 
 interface Props {
   friend: FriendEntry
   onClose: () => void
 }
 
-function CoverItem({ book }: { book: UserBook }) {
+function CoverItem({ book, onClick }: { book: UserBook; onClick: () => void }) {
   const toHttps = (u: string) => u.replace('http://', 'https://')
   const [src, setSrc] = useState(toHttps(book.coverUrl))
   const fallback = toHttps(book.thumbnailUrl ?? '')
 
   return (
-    <div className="flex items-center gap-3 py-3 border-b border-slate-800/50">
+    <button onClick={onClick} className="flex w-full items-center gap-3 py-3 border-b border-slate-800/50 text-left transition active:scale-[0.99]">
       <div className="w-1 self-stretch shrink-0 rounded-full bg-emerald-500/60" />
       <div className="h-14 w-10 shrink-0 overflow-hidden rounded-lg bg-slate-800 shadow">
         {src ? (
@@ -32,7 +33,7 @@ function CoverItem({ book }: { book: UserBook }) {
           </p>
         )}
       </div>
-    </div>
+    </button>
   )
 }
 
@@ -62,6 +63,7 @@ function ReadingItem({ book }: { book: UserBook }) {
 export default function FriendLibraryScreen({ friend, onClose }: Props) {
   const [books, setBooks] = useState<UserBook[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [selectedBook, setSelectedBook] = useState<UserBook | null>(null)
 
   useEffect(() => {
     getFriendBooks(friend.uid)
@@ -89,6 +91,14 @@ export default function FriendLibraryScreen({ friend, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-950">
+      {selectedBook && (
+        <BookDetailModal
+          book={selectedBook}
+          readOnly
+          onClose={() => setSelectedBook(null)}
+          onUpdated={() => {}}
+        />
+      )}
       <div className="flex items-center gap-3 px-4 pt-12 pb-4 sm:pt-6">
         <button
           onClick={onClose}
@@ -148,7 +158,7 @@ export default function FriendLibraryScreen({ friend, onClose }: Props) {
               grouped.map(({ label, items }) => (
                 <section key={label}>
                   <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-500">{label}</p>
-                  {items.map((b) => <CoverItem key={b.id} book={b} />)}
+                  {items.map((b) => <CoverItem key={b.id} book={b} onClick={() => setSelectedBook(b)} />)}
                 </section>
               ))
             )}

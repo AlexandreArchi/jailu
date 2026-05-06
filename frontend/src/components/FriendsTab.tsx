@@ -3,12 +3,12 @@ import {
   searchUserByUsername,
   sendFriendRequest,
   cancelFriendRequest,
-  getPendingRequests,
   acceptFriendRequest,
   rejectFriendRequest,
-  getMyFriends,
   removeFriend,
   checkFriendshipStatus,
+  subscribeToPendingRequests,
+  subscribeToFriends,
   type FriendshipStatus,
 } from '../lib/firestore'
 import type { FriendEntry, FriendRequest, UserProfile } from '../types/book'
@@ -34,15 +34,18 @@ export default function FriendsTab({ myUid, onPendingCountChange }: Props) {
   const [isLoading, setIsLoading] = useState(true)
   const [viewingFriend, setViewingFriend] = useState<FriendEntry | null>(null)
 
-  const loadData = async () => {
-    const [reqs, frs] = await Promise.all([getPendingRequests(), getMyFriends()])
-    setPendingRequests(reqs)
-    setFriends(frs)
-    onPendingCountChange(reqs.length)
-    setIsLoading(false)
-  }
-
-  useEffect(() => { void loadData() }, [])
+  useEffect(() => {
+    const unsubReqs = subscribeToPendingRequests((reqs) => {
+      setPendingRequests(reqs)
+      onPendingCountChange(reqs.length)
+      setIsLoading(false)
+    })
+    const unsubFriends = subscribeToFriends((frs) => {
+      setFriends(frs)
+      setIsLoading(false)
+    })
+    return () => { unsubReqs(); unsubFriends() }
+  }, [myUid])
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -72,18 +75,15 @@ export default function FriendsTab({ myUid, onPendingCountChange }: Props) {
 
   const handleAccept = async (req: FriendRequest) => {
     await acceptFriendRequest(req.uid, req.username)
-    await loadData()
     setSearchState({ kind: 'idle' })
   }
 
   const handleReject = async (fromUid: string) => {
     await rejectFriendRequest(fromUid)
-    await loadData()
   }
 
   const handleRemoveFriend = async (friendUid: string) => {
     await removeFriend(friendUid)
-    await loadData()
     if (viewingFriend?.uid === friendUid) setViewingFriend(null)
   }
 

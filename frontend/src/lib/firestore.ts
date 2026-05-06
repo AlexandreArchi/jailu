@@ -13,6 +13,7 @@ import {
   orderBy,
   where,
   writeBatch,
+  onSnapshot,
   Timestamp,
 } from 'firebase/firestore'
 import { auth } from './firebase'
@@ -240,6 +241,30 @@ export async function checkFriendshipStatus(otherUid: string): Promise<Friendshi
   if (sentSnap.exists()) return 'pending_sent'
   if (receivedSnap.exists()) return 'pending_received'
   return 'none'
+}
+
+export function subscribeToPendingRequests(callback: (reqs: FriendRequest[]) => void): () => void {
+  const userId = auth.currentUser?.uid
+  if (!userId) return () => {}
+  return onSnapshot(collection(db, 'users', userId, 'friendRequests'), (snap) => {
+    callback(snap.docs.map((d) => ({
+      uid: d.id,
+      username: d.data().fromUsername as string,
+      createdAt: toDate(d.data().createdAt) ?? new Date(),
+    })))
+  })
+}
+
+export function subscribeToFriends(callback: (friends: FriendEntry[]) => void): () => void {
+  const userId = auth.currentUser?.uid
+  if (!userId) return () => {}
+  return onSnapshot(collection(db, 'users', userId, 'friends'), (snap) => {
+    callback(snap.docs.map((d) => ({
+      uid: d.id,
+      username: d.data().username as string,
+      since: toDate(d.data().since) ?? new Date(),
+    })))
+  })
 }
 
 export async function getFriendBooks(friendUid: string): Promise<UserBook[]> {
