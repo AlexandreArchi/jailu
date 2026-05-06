@@ -11,56 +11,69 @@ interface HomeTabProps {
   onGoToSearch: () => void
 }
 
-function CoverThumb({
-  book,
-  onClick,
-  size = 'md',
-}: {
-  book: UserBook
-  onClick: () => void
-  size?: 'sm' | 'md'
-}) {
+function CoverCard({ book, onClick }: { book: UserBook; onClick: () => void }) {
   const toHttps = (url: string) => url.replace('http://', 'https://')
   const [src, setSrc] = useState(toHttps(book.coverUrl))
   const fallback = toHttps(book.thumbnailUrl ?? '')
 
-  const dims = size === 'sm' ? 'h-24 w-16' : 'h-32 w-22'
-
   return (
-    <button onClick={onClick} className="shrink-0 flex flex-col gap-1.5">
-      <div className={`${dims} overflow-hidden rounded-xl bg-slate-800 shadow-lg`}>
-        {src ? (
-          <img
-            src={src}
-            alt={book.title}
-            className="h-full w-full object-cover"
-            onError={() => {
-              if (src !== fallback && fallback) setSrc(fallback)
-              else setSrc('')
-            }}
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center p-1 text-center text-[9px] text-slate-600">
-            {book.title}
-          </div>
-        )}
+    <button
+      onClick={onClick}
+      className="shrink-0 group relative h-44 w-[104px] overflow-hidden rounded-2xl bg-slate-800 shadow-xl active:scale-95 transition-transform duration-150"
+    >
+      {src ? (
+        <img
+          src={src}
+          alt={book.title}
+          className="h-full w-full object-cover"
+          onError={() => { if (src !== fallback && fallback) setSrc(fallback); else setSrc('') }}
+        />
+      ) : (
+        <div className="flex h-full items-center justify-center p-2 text-center text-[9px] text-slate-500 bg-slate-800">
+          {book.title}
+        </div>
+      )}
+      {/* Gradient overlay with title */}
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent px-2 pb-2 pt-8">
+        <p className="text-[10px] font-semibold text-white leading-tight line-clamp-2">{book.title}</p>
       </div>
-      <p className="w-16 truncate text-center text-[10px] text-slate-400 leading-tight">
-        {book.title}
-      </p>
     </button>
   )
 }
 
-export default function HomeTab({
-  books,
-  isLoading,
-  displayName,
-  onBookClick,
-  onGoToTab,
-  onShowStats,
-  onGoToSearch,
-}: HomeTabProps) {
+function LastReadItem({ book, onClick }: { book: UserBook; onClick: () => void }) {
+  const toHttps = (url: string) => url.replace('http://', 'https://')
+  const [src, setSrc] = useState(toHttps(book.coverUrl))
+  const fallback = toHttps(book.thumbnailUrl ?? '')
+
+  return (
+    <button
+      onClick={onClick}
+      className="flex w-full items-center gap-3 rounded-2xl bg-slate-800/50 px-3 py-3 text-left ring-1 ring-white/5 transition-all duration-150 hover:bg-slate-800 hover:ring-white/10 active:scale-[0.98]"
+    >
+      <div className="h-14 w-10 shrink-0 overflow-hidden rounded-xl bg-slate-700 shadow-md">
+        {src ? (
+          <img src={src} alt={book.title} className="h-full w-full object-cover"
+            onError={() => { if (src !== fallback && fallback) setSrc(fallback); else setSrc('') }} />
+        ) : (
+          <div className="h-full w-full bg-slate-700" />
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-white">{book.title}</p>
+        <p className="truncate text-xs text-slate-500 mt-0.5">{book.authors[0] ?? ''}</p>
+      </div>
+      {book.rating !== null && (
+        <div className="shrink-0 flex items-center gap-0.5">
+          <span className="text-amber-400 text-sm">★</span>
+          <span className="text-xs font-semibold text-amber-400">{book.rating}</span>
+        </div>
+      )}
+    </button>
+  )
+}
+
+export default function HomeTab({ books, isLoading, displayName, onBookClick, onGoToTab, onShowStats, onGoToSearch }: HomeTabProps) {
   const toRead = books.filter((b) => b.status === 'to_read')
   const reading = books.filter((b) => b.status === 'reading')
   const read = books.filter((b) => b.status === 'read')
@@ -77,59 +90,66 @@ export default function HomeTab({
   if (books.length === 0) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-        <p className="text-2xl font-bold text-white">Bonjour {displayName} 👋</p>
-        <p className="mt-2 text-slate-400">Ta bibliothèque est vide.</p>
-        <p className="text-slate-500 text-sm mt-1">Tape dans Recherche pour ajouter ton premier livre.</p>
+        <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-3xl bg-indigo-600/20 ring-1 ring-indigo-500/30">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="h-10 w-10 text-indigo-400">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+          </svg>
+        </div>
+        <p className="text-xl font-bold text-white">Bonjour {displayName}</p>
+        <p className="mt-2 text-sm text-slate-400">Ta bibliothèque est vide.</p>
+        <button
+          onClick={onGoToSearch}
+          className="mt-6 rounded-2xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500 active:scale-95"
+        >
+          Ajouter mon premier livre
+        </button>
       </div>
     )
   }
 
   return (
-    <div className="flex-1 overflow-y-auto pb-24">
-      {/* FAB Ajouter */}
+    <div className="flex-1 overflow-y-auto pb-28">
+      {/* FAB */}
       <button
         onClick={onGoToSearch}
-        className="fixed bottom-24 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600 shadow-xl transition hover:bg-indigo-500 active:scale-95"
+        className="fixed bottom-24 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600 shadow-2xl shadow-indigo-900/50 transition hover:bg-indigo-500 active:scale-95"
         aria-label="Ajouter un livre"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-6 w-6 text-white">
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
         </svg>
       </button>
-      <div className="space-y-6 px-4 pt-4 sm:px-6">
-        {/* Résumé cards */}
+
+      <div className="space-y-7 px-4 pt-5 sm:px-6">
+        {/* Summary cards */}
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={() => onGoToTab('to_read')}
-            className="rounded-2xl bg-gradient-to-br from-indigo-900/60 to-slate-800 p-4 text-left ring-1 ring-slate-700/50 transition hover:ring-indigo-700/50"
+            className="rounded-3xl bg-gradient-to-br from-indigo-600/30 via-indigo-900/20 to-slate-900 p-5 text-left ring-1 ring-indigo-500/20 transition-all duration-200 hover:ring-indigo-500/40 active:scale-[0.97]"
           >
-            <p className="text-xs font-medium text-slate-400">À lire{reading.length > 0 ? ` · ${reading.length} en cours` : ''}</p>
-            <p className="mt-1 text-4xl font-bold text-white">{toRead.length + reading.length}</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-indigo-400/80">À lire</p>
+            <p className="mt-2 text-5xl font-bold tracking-tight text-white">{toRead.length + reading.length}</p>
+            {reading.length > 0 && (
+              <p className="mt-1.5 text-[10px] text-indigo-300/60">{reading.length} en cours</p>
+            )}
           </button>
           <button
             onClick={onShowStats}
-            className="rounded-2xl bg-gradient-to-br from-emerald-900/60 to-slate-800 p-4 text-left ring-1 ring-slate-700/50 transition hover:ring-emerald-700/50"
+            className="rounded-3xl bg-gradient-to-br from-emerald-600/30 via-emerald-900/20 to-slate-900 p-5 text-left ring-1 ring-emerald-500/20 transition-all duration-200 hover:ring-emerald-500/40 active:scale-[0.97]"
           >
-            <p className="text-xs font-medium text-slate-400">Livres lus</p>
-            <div className="mt-1 flex items-end justify-between">
-              <p className="text-4xl font-bold text-white">{read.length}</p>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="mb-1 h-5 w-5 text-emerald-400">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            </div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-400/80">Lus</p>
+            <p className="mt-2 text-5xl font-bold tracking-tight text-white">{read.length}</p>
+            <p className="mt-1.5 text-[10px] text-emerald-300/60">Voir les stats →</p>
           </button>
         </div>
 
         {/* En cours */}
         {reading.length > 0 && (
           <section>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-white">En cours</h2>
-              <span className="text-xs text-slate-500">{reading.length} livre{reading.length > 1 ? 's' : ''}</span>
-            </div>
-            <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+            <SectionHeader label="En cours" count={reading.length} />
+            <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
               {reading.map((book) => (
-                <CoverThumb key={book.id} book={book} onClick={() => onBookClick(book)} />
+                <CoverCard key={book.id} book={book} onClick={() => onBookClick(book)} />
               ))}
             </div>
           </section>
@@ -138,18 +158,10 @@ export default function HomeTab({
         {/* À lire */}
         {toRead.length > 0 && (
           <section>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-white">À lire</h2>
-              <button
-                onClick={() => onGoToTab('to_read')}
-                className="text-xs font-medium text-indigo-400 hover:text-indigo-300"
-              >
-                Afficher tout
-              </button>
-            </div>
-            <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
-              {toRead.slice(0, 10).map((book) => (
-                <CoverThumb key={book.id} book={book} onClick={() => onBookClick(book)} />
+            <SectionHeader label="À lire" onAction={() => onGoToTab('to_read')} actionLabel="Tout voir" />
+            <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
+              {toRead.slice(0, 12).map((book) => (
+                <CoverCard key={book.id} book={book} onClick={() => onBookClick(book)} />
               ))}
             </div>
           </section>
@@ -158,15 +170,7 @@ export default function HomeTab({
         {/* Derniers lus */}
         {lastRead.length > 0 && (
           <section>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-white">Derniers lus</h2>
-              <button
-                onClick={() => onGoToTab('read')}
-                className="text-xs font-medium text-indigo-400 hover:text-indigo-300"
-              >
-                Afficher tout
-              </button>
-            </div>
+            <SectionHeader label="Derniers lus" onAction={() => onGoToTab('read')} actionLabel="Tout voir" />
             <div className="space-y-2">
               {lastRead.map((book) => (
                 <LastReadItem key={book.id} book={book} onClick={() => onBookClick(book)} />
@@ -179,31 +183,25 @@ export default function HomeTab({
   )
 }
 
-function LastReadItem({ book, onClick }: { book: UserBook; onClick: () => void }) {
-  const toHttps = (url: string) => url.replace('http://', 'https://')
-  const [src, setSrc] = useState(toHttps(book.coverUrl))
-  const fallback = toHttps(book.thumbnailUrl ?? '')
-
+function SectionHeader({ label, count, onAction, actionLabel }: {
+  label: string
+  count?: number
+  onAction?: () => void
+  actionLabel?: string
+}) {
   return (
-    <button
-      onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-xl bg-slate-800/60 px-3 py-2.5 text-left transition hover:bg-slate-800 active:bg-slate-700"
-    >
-      <div className="h-12 w-8 shrink-0 overflow-hidden rounded-md bg-slate-700">
-        {src ? (
-          <img src={src} alt={book.title} className="h-full w-full object-cover"
-            onError={() => { if (src !== fallback && fallback) setSrc(fallback); else setSrc('') }} />
-        ) : (
-          <div className="h-full w-full bg-slate-700" />
+    <div className="mb-3 flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <h2 className="text-base font-bold text-white">{label}</h2>
+        {count !== undefined && (
+          <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-slate-400">{count}</span>
         )}
       </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-white">{book.title}</p>
-        <p className="truncate text-xs text-slate-500">{book.authors[0] ?? ''}</p>
-      </div>
-      {book.rating !== null && (
-        <p className="shrink-0 text-xs text-amber-400">{'★'.repeat(book.rating)}</p>
+      {onAction && (
+        <button onClick={onAction} className="text-xs font-medium text-indigo-400 transition hover:text-indigo-300">
+          {actionLabel}
+        </button>
       )}
-    </button>
+    </div>
   )
 }

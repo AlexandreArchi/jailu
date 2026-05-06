@@ -49,7 +49,7 @@ export default function BottomNav({ active, onChange, toReadCount, readCount }: 
   ]
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-800 bg-slate-950/95 backdrop-blur-md pb-safe">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-md pb-safe">
       <div className="mx-auto flex max-w-lg">
         {tabs.map(({ key, label, count }) => {
           const isActive = active === key
@@ -57,10 +57,13 @@ export default function BottomNav({ active, onChange, toReadCount, readCount }: 
             <button
               key={key}
               onClick={() => onChange(key)}
-              className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 transition-colors ${
+              className={`relative flex flex-1 flex-col items-center gap-0.5 py-3 transition-colors ${
                 isActive ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'
               }`}
             >
+              {isActive && (
+                <span className="absolute top-0 left-1/2 -translate-x-1/2 h-0.5 w-8 rounded-full bg-indigo-500" />
+              )}
               <div className="relative">
                 {key === 'home' && <HomeIcon active={isActive} />}
                 {key === 'to_read' && <BookmarkIcon active={isActive} />}

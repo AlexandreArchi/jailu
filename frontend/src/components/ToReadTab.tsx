@@ -15,6 +15,8 @@ const STATUS_LABEL: Record<string, string> = {
   to_read: 'À lire',
 }
 
+const ACCENT = { reading: 'bg-indigo-500', to_read: 'bg-slate-700' }
+
 function BookRow({ book, onClick }: { book: UserBook; onClick: () => void }) {
   const toHttps = (url: string) => url.replace('http://', 'https://')
   const [src, setSrc] = useState(toHttps(book.coverUrl))
@@ -27,9 +29,10 @@ function BookRow({ book, onClick }: { book: UserBook; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="flex w-full items-center gap-3 border-b border-slate-800/60 px-4 py-3 text-left transition hover:bg-slate-800/40 active:bg-slate-800"
+      className="flex w-full items-center gap-3 border-b border-slate-800/50 px-4 py-3 text-left transition-all duration-150 hover:bg-slate-800/40 active:bg-slate-800/70 active:scale-[0.99]"
     >
-      <div className="h-14 w-10 shrink-0 overflow-hidden rounded-lg bg-slate-800 shadow">
+      <div className={`w-1 self-stretch shrink-0 rounded-full ${ACCENT[book.status]}`} />
+      <div className="h-16 w-11 shrink-0 overflow-hidden rounded-xl bg-slate-800 shadow-md">
         {src ? (
           <img src={src} alt={book.title} className="h-full w-full object-cover"
             onError={() => { if (src !== fallback && fallback) setSrc(fallback); else setSrc('') }} />
@@ -44,14 +47,14 @@ function BookRow({ book, onClick }: { book: UserBook; onClick: () => void }) {
         <p className="truncate text-sm font-semibold text-white">{book.title}</p>
         <p className="truncate text-xs text-slate-500 mt-0.5">{book.authors.join(', ')}</p>
         {dateAdded && (
-          <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-slate-600">
+          <p className="mt-1.5 text-[10px] font-medium uppercase tracking-wide text-slate-600">
             Ajouté le {dateAdded}
           </p>
         )}
       </div>
 
       <div className="flex shrink-0 flex-col items-end gap-1.5">
-        <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_BADGE[book.status]}`}>
+        <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${STATUS_BADGE[book.status]}`}>
           {STATUS_LABEL[book.status]}
         </span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4 text-slate-600">
