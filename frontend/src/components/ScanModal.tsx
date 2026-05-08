@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { readBarcodesFromImageData } from 'zxing-wasm/reader'
+import { readBarcodesFromImageData, prepareZXingModule } from 'zxing-wasm/reader'
+
+// Charge le WASM depuis notre propre hébergement (pas le CDN jsDelivr)
+prepareZXingModule({
+  overrides: {
+    locateFile: (path: string) => path.endsWith('.wasm') ? '/zxing_reader.wasm' : path,
+  },
+})
 
 // Native BarcodeDetector API (Chrome/Android)
 type NativeDetector = {
@@ -125,7 +132,11 @@ export default function ScanModal({ onScan, onClose }: ScanModalProps) {
           animFrame = requestAnimationFrame(tick)
         } else {
           // ── iOS : zxing-wasm (C++) en boucle rAF ──
-          log('iOS — zxing-wasm actif')
+          log('chargement WASM…')
+          await prepareZXingModule({ fireImmediately: true })
+          if (stopped) return
+          log('iOS — scan actif')
+
           const canvas = document.createElement('canvas')
           let decoding = false
 
@@ -149,7 +160,9 @@ export default function ScanModal({ onScan, onClose }: ScanModalProps) {
                     log(`lu: ${text}`)
                     if (isISBN(text)) { found(text); return }
                   }
-                } catch { /* ignore */ }
+                } catch (e) {
+                  log(`err wasm: ${e instanceof Error ? e.message : String(e)}`)
+                }
               }
               decoding = false
             }
