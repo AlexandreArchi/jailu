@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { BrowserMultiFormatReader } from '@zxing/browser'
-import type { IScannerControls } from '@zxing/browser'
+import { readBarcodesFromImageData } from 'zxing-wasm/reader'
 
 // Native BarcodeDetector API (Chrome/Android)
 type NativeDetector = {
@@ -16,19 +15,18 @@ interface ScanModalProps {
 
 const isISBN = (s: string) => /^97[89]\d{10}$/.test(s)
 
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+const isIOS = typeof BarcodeDetector === 'undefined'
+
 export default function ScanModal({ onScan, onClose }: ScanModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const controlsRef = useRef<IScannerControls | null>(null)
   const detectedRef = useRef(false)
   const [error, setError] = useState<string | null>(null)
   const [detected, setDetected] = useState(false)
   const [debugLog, setDebugLog] = useState<string>('démarrage…')
   const [showShutter, setShowShutter] = useState(false)
   const [capturing, setCapturing] = useState(false)
-
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  const isIOS = typeof BarcodeDetector === 'undefined'
 
   const log = (msg: string) => {
     console.log('[Scanner]', msg)
@@ -42,32 +40,48 @@ export default function ScanModal({ onScan, onClose }: ScanModalProps) {
     onScan(isbn)
   }
 
-  /** Capture manuelle : snapshot haute résolution → ZXing image statique */
+  /** Décode une frame ou une image statique via zxing-wasm (C++, bien meilleur qu'@zxing/browser) */
+  const decodeImageData = async (imageData: ImageData): Promise<string | null> => {
+    const results = await readBarcodesFromImageData(imageData, {
+      formats: ['EAN-13', 'EAN-8'],
+      tryHarder: true,
+    })
+    for (const r of results) {
+      if (r.isValid) return r.text
+    }
+    return null
+  }
+
+  /** Capture manuelle haute résolution → zxing-wasm */
   const captureAndDecode = async () => {
     const video = videoRef.current
     if (!video || detectedRef.current) return
     setCapturing(true)
-    log('capture manuelle…')
+    setError(null)
+    log('capture…')
 
     const canvas = document.createElement('canvas')
     canvas.width = video.videoWidth || 1280
     canvas.height = video.videoHeight || 720
-    canvas.getContext('2d')?.drawImage(video, 0, 0, canvas.width, canvas.height)
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.95)
+    const ctx = canvas.getContext('2d')
+    if (!ctx) { setCapturing(false); return }
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
 
     try {
-      const reader = new BrowserMultiFormatReader()
-      const result = await reader.decodeFromImageUrl(dataUrl)
-      const text = result.getText()
-      log(`capture: ${text}`)
-      if (isISBN(text)) {
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+      const text = await decodeImageData(imageData)
+      if (text && isISBN(text)) {
         found(text)
-      } else {
+      } else if (text) {
+        log(`non-ISBN: ${text}`)
         setError(`Code non reconnu (${text}). Réessayez.`)
+      } else {
+        setError('Aucun code-barres détecté. Rapprochez-vous.')
+        log('rien détecté')
       }
-    } catch {
-      setError('Aucun code-barres détecté. Rapprochez-vous et réessayez.')
-      log('capture: rien détecté')
+    } catch (e) {
+      setError('Erreur décodage. Réessayez.')
+      log(`erreur: ${e instanceof Error ? e.message : String(e)}`)
     } finally {
       setCapturing(false)
     }
@@ -79,27 +93,24 @@ export default function ScanModal({ onScan, onClose }: ScanModalProps) {
 
     const startCamera = async () => {
       try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            advanced: [{ focusMode: 'continuous' }] as any,
+          },
+        })
+        streamRef.current = stream
+        if (stopped || !videoRef.current) { stream.getTracks().forEach((t) => t.stop()); return }
+        videoRef.current.srcObject = stream
+        await videoRef.current.play()
+
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        const nativeDetector = typeof BarcodeDetector !== 'undefined'
-        log(nativeDetector ? 'Android — BarcodeDetector' : 'iOS — ZXing')
-
-        if (nativeDetector) {
-          // ── Android : stream manuel + BarcodeDetector natif ──
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: { ideal: 'environment' },
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              advanced: [{ focusMode: 'continuous' }] as any,
-            },
-          })
-          streamRef.current = stream
-          if (stopped || !videoRef.current) { stream.getTracks().forEach((t) => t.stop()); return }
-          videoRef.current.srcObject = stream
-          await videoRef.current.play()
-          log('caméra active…')
-
+        if (typeof BarcodeDetector !== 'undefined') {
+          // ── Android : BarcodeDetector natif ──
+          log('Android — BarcodeDetector')
           const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'code_128'] })
           const tick = async () => {
             if (stopped || detectedRef.current || !videoRef.current) return
@@ -107,54 +118,49 @@ export default function ScanModal({ onScan, onClose }: ScanModalProps) {
               const results = await detector.detect(videoRef.current)
               for (const r of results) {
                 if (isISBN(r.rawValue)) { found(r.rawValue); return }
-                log(`code non-ISBN: ${r.rawValue}`)
               }
             } catch { /* vidéo pas encore prête */ }
             animFrame = requestAnimationFrame(tick)
           }
           animFrame = requestAnimationFrame(tick)
         } else {
-          // ── iOS : ZXing continu via decodeFromConstraints ──
-          if (!videoRef.current) return
-          log('ZXing: démarrage…')
-          const reader = new BrowserMultiFormatReader()
-          const controls = await reader.decodeFromConstraints(
-            {
-              video: {
-                facingMode: { ideal: 'environment' },
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-              },
-            },
-            videoRef.current,
-            (result, err) => {
-              if (result) {
-                const text = result.getText()
-                log(`lu: ${text}`)
-                if (isISBN(text)) found(text)
-              } else if (err?.name !== 'NotFoundException') {
-                log(`err: ${err?.message ?? '?'}`)
+          // ── iOS : zxing-wasm (C++) en boucle rAF ──
+          log('iOS — zxing-wasm actif')
+          const canvas = document.createElement('canvas')
+          let decoding = false
+
+          // Proposer le shutter au bout de 4 s si rien détecté
+          setTimeout(() => { if (!detectedRef.current && !stopped) setShowShutter(true) }, 4000)
+
+          const tick = async () => {
+            if (stopped || detectedRef.current || !videoRef.current) return
+            const video = videoRef.current
+            if (!decoding && video.readyState >= 2 && video.videoWidth > 0) {
+              decoding = true
+              canvas.width = video.videoWidth
+              canvas.height = video.videoHeight
+              const ctx = canvas.getContext('2d')
+              if (ctx) {
+                ctx.drawImage(video, 0, 0)
+                try {
+                  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+                  const text = await decodeImageData(imageData)
+                  if (text) {
+                    log(`lu: ${text}`)
+                    if (isISBN(text)) { found(text); return }
+                  }
+                } catch { /* ignore */ }
               }
-            },
-          )
-          if (stopped) { controls.stop(); return }
-          controlsRef.current = controls
-
-          // Vidéo injectée par ZXing — on synchronise notre ref
-          const injectedVideo = document.querySelector<HTMLVideoElement>('#__zxing_video__') ?? videoRef.current
-          streamRef.current = injectedVideo.srcObject as MediaStream | null
-
-          log('ZXing actif — pointez le code')
-
-          // Après 3 s sans détection, proposer le bouton shutter
-          setTimeout(() => {
-            if (!detectedRef.current && !stopped) setShowShutter(true)
-          }, 3000)
+              decoding = false
+            }
+            animFrame = requestAnimationFrame(tick)
+          }
+          animFrame = requestAnimationFrame(tick)
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         if (!stopped) {
-          setError(`Erreur: ${msg}`)
+          setError(`Erreur caméra: ${msg}`)
           log(`erreur: ${msg}`)
           if (isIOS) setShowShutter(true)
         }
@@ -166,7 +172,6 @@ export default function ScanModal({ onScan, onClose }: ScanModalProps) {
     return () => {
       stopped = true
       cancelAnimationFrame(animFrame)
-      controlsRef.current?.stop()
       streamRef.current?.getTracks().forEach((t) => t.stop())
       if (videoRef.current) videoRef.current.srcObject = null
     }
@@ -238,7 +243,6 @@ export default function ScanModal({ onScan, onClose }: ScanModalProps) {
             <p className="text-sm text-white/80">
               {showShutter ? 'Appuyez pour capturer' : 'Pointez la caméra vers le code-barres'}
             </p>
-            {/* Bouton shutter affiché sur iOS après 3 s */}
             {isIOS && showShutter && (
               <button
                 onClick={() => void captureAndDecode()}
@@ -248,9 +252,7 @@ export default function ScanModal({ onScan, onClose }: ScanModalProps) {
             )}
           </>
         )}
-
-        {/* Debug log — blanc, visible */}
-        <p className="text-xs text-white/60 font-mono">{debugLog}</p>
+        <p className="text-xs text-white/50 font-mono">{debugLog}</p>
       </div>
 
       <button
