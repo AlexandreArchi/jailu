@@ -762,9 +762,8 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
               <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Synopsis</p>
               <div
                 style={{
-                  maxHeight: showFullDesc ? '600px' : '96px',
+                  maxHeight: showFullDesc ? 'none' : '96px',
                   overflow: 'hidden',
-                  transition: 'max-height 0.3s ease',
                 }}
               >
                 <p className="text-sm leading-relaxed text-slate-400">{book.description}</p>
