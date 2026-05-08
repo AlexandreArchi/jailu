@@ -6,6 +6,7 @@ export interface UserProfile {
   photoURL: string | null
   createdAt: Date
   readingGoal?: { year: number; target: number } | null
+  isPublic?: boolean
 }
 
 export interface FriendEntry {

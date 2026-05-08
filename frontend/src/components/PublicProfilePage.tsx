@@ -62,7 +62,7 @@ export default function PublicProfilePage({ username }: Props) {
       try {
         const p = await getProfileByUsername(username)
         if (cancelled) return
-        if (!p) { setStatus('notFound'); return }
+        if (!p || p.isPublic === false) { setStatus('notFound'); return }
         setProfile(p)
         const allBooks = await getPublicBooks(p.uid)
         if (cancelled) return

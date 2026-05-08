@@ -3,7 +3,7 @@ import { signOut } from 'firebase/auth'
 import type { User } from 'firebase/auth'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { auth, storage } from '../lib/firebase'
-import { updateUserPhotoURL } from '../lib/firestore'
+import { updateUserPhotoURL, setProfilePublic } from '../lib/firestore'
 import type { UserProfile } from '../types/book'
 
 interface Props {
@@ -27,7 +27,18 @@ export default function ProfileModal({ user, profile, onClose, onPhotoUpdated }:
   const [uploadError, setUploadError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [copied, setCopied] = useState(false)
+  const [isPublic, setIsPublic] = useState(profile.isPublic ?? true)
   const publicUrl = `https://jailu-prod.web.app/u/${profile.username}`
+
+  const handleTogglePublic = async () => {
+    const next = !isPublic
+    setIsPublic(next)
+    try {
+      await setProfilePublic(next)
+    } catch {
+      setIsPublic(!next) // rollback
+    }
+  }
 
   const handleShare = useCallback(async () => {
     if (navigator.share) {
@@ -138,8 +149,19 @@ export default function ProfileModal({ user, profile, onClose, onPhotoUpdated }:
         </div>
 
         {/* Public profile */}
-        <div className="border-t border-slate-700/60 px-6 py-4 space-y-2">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">Mon profil public</p>
+        <div className="border-t border-slate-700/60 px-6 py-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">Mon profil public</p>
+            <button
+              onClick={() => void handleTogglePublic()}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${isPublic ? 'bg-indigo-600' : 'bg-slate-600'}`}
+              role="switch"
+              aria-checked={isPublic}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${isPublic ? 'translate-x-4' : 'translate-x-0'}`} />
+            </button>
+          </div>
+          {isPublic ? (
           <div className="flex items-center gap-2">
             <a
               href={publicUrl}
@@ -170,6 +192,9 @@ export default function ProfileModal({ user, profile, onClose, onPhotoUpdated }:
               )}
             </button>
           </div>
+          ) : (
+            <p className="text-xs text-slate-500">Ton profil est privé — personne ne peut voir ta bibliothèque.</p>
+          )}
         </div>
 
         {/* Logout */}

@@ -185,7 +185,14 @@ export async function getMyProfile(): Promise<UserProfile | null> {
     photoURL: (d.photoURL as string | null) ?? null,
     createdAt: toDate(d.createdAt) ?? new Date(),
     readingGoal: (d.readingGoal as { year: number; target: number } | null) ?? null,
+    isPublic: (d.isPublic as boolean | undefined) ?? true,
   }
+}
+
+export async function setProfilePublic(isPublic: boolean): Promise<void> {
+  const userId = auth.currentUser?.uid
+  if (!userId) throw new Error('Non authentifié')
+  await updateDoc(doc(db, 'users', userId), { isPublic })
 }
 
 export async function setReadingGoal(year: number, target: number | null): Promise<void> {
@@ -481,6 +488,7 @@ export async function getProfileByUsername(username: string): Promise<UserProfil
     username: d.data().username as string,
     photoURL: (d.data().photoURL as string | null) ?? null,
     createdAt: toDate(d.data().createdAt) ?? new Date(),
+    isPublic: (d.data().isPublic as boolean | undefined) ?? true,
   }
 }
 
