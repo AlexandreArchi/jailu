@@ -409,7 +409,7 @@ export async function createStory(
 export async function getMyStories(): Promise<Story[]> {
   const userId = auth.currentUser?.uid
   if (!userId) return []
-  const sevenDaysAgo = Timestamp.fromDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
+  const sevenDaysAgo = Timestamp.fromDate(new Date(Date.now() - 24 * 60 * 60 * 1000))
   const q = query(
     collection(db, 'users', userId, 'stories'),
     where('createdAt', '>=', sevenDaysAgo),
@@ -432,7 +432,7 @@ export async function getMyStories(): Promise<Story[]> {
 
 export async function getFriendsStories(friends: FriendEntry[]): Promise<Story[]> {
   if (friends.length === 0) return []
-  const sevenDaysAgo = Timestamp.fromDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
+  const sevenDaysAgo = Timestamp.fromDate(new Date(Date.now() - 24 * 60 * 60 * 1000))
   const results = await Promise.all(
     friends.map(async ({ uid, username }) => {
       try {

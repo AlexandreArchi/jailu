@@ -1,4 +1,288 @@
 import { useRef, useState } from 'react'
+
+/* ── Share card generator ────────────────────────────────────────────────── */
+
+/** Load same-origin image (e.g. app icon) */
+function loadLocalImg(src: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => resolve(null)
+    img.src = src
+  })
+}
+
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:8000'
+
+/**
+ * Fetch a URL and return an HTMLImageElement usable in canvas (same-origin blob).
+ * Works for any URL that sends CORS headers (e.g. Open Library).
+ */
+async function fetchImg(url: string): Promise<HTMLImageElement | null> {
+  if (!url) return null
+  try {
+    const resp = await fetch(url)
+    if (!resp.ok) return null
+    const blob = await resp.blob()
+    const blobUrl = URL.createObjectURL(blob)
+    return new Promise<HTMLImageElement | null>((resolve) => {
+      const img = new Image()
+      img.onload = () => { URL.revokeObjectURL(blobUrl); resolve(img) }
+      img.onerror = () => { URL.revokeObjectURL(blobUrl); resolve(null) }
+      img.src = blobUrl
+    })
+  } catch {
+    return null
+  }
+}
+
+/** Proxy through our backend (future-proof for CDNs without CORS headers). */
+async function fetchImgViaProxy(url: string): Promise<HTMLImageElement | null> {
+  if (!url) return null
+  return fetchImg(`${API_BASE}/api/proxy/image?url=${encodeURIComponent(url)}`)
+}
+
+function drawRoundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.lineTo(x + w - r, y)
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r)
+  ctx.lineTo(x + w, y + h - r)
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
+  ctx.lineTo(x + r, y + h)
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r)
+  ctx.lineTo(x, y + r)
+  ctx.quadraticCurveTo(x, y, x + r, y)
+  ctx.closePath()
+}
+
+function wrapText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxW: number, lineH: number, maxLines = 2): number {
+  const words = text.split(' ')
+  let line = ''
+  let linesDrawn = 0
+  for (const word of words) {
+    const test = line ? `${line} ${word}` : word
+    if (ctx.measureText(test).width > maxW && line) {
+      if (linesDrawn >= maxLines - 1) {
+        ctx.fillText(line.trimEnd() + '…', x, y + linesDrawn * lineH)
+        return linesDrawn + 1
+      }
+      ctx.fillText(line, x, y + linesDrawn * lineH)
+      line = word
+      linesDrawn++
+    } else {
+      line = test
+    }
+  }
+  if (line) { ctx.fillText(line, x, y + linesDrawn * lineH); linesDrawn++ }
+  return linesDrawn
+}
+
+async function generateShareCard(
+  title: string,
+  authors: string[],
+  coverUrl: string,
+  fallbackUrl: string,
+  rating: number | null,
+  palette: { bg: string; fg: string },
+  username?: string,
+  isbn13?: string | null,
+  isbn10?: string | null,
+): Promise<File | null> {
+  const W = 1080, H = 1350
+  const canvas = document.createElement('canvas')
+  canvas.width = W; canvas.height = H
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+
+  // ── Load images in parallel ──
+  const appIconUrl = new URL('/app-icon.svg', window.location.href).href
+
+  // Priority order for cover:
+  // 1. Open Library via ISBN (has CORS headers → works directly with fetch)
+  // 2. Stored coverUrl direct (works if server has CORS, e.g. Open Library stored URL)
+  // 3. Stored coverUrl via backend proxy (fallback for non-CORS CDNs like Google Books)
+  // 4. Stored fallbackUrl via backend proxy
+  const coverCandidates: string[] = [
+    isbn13 ? `https://covers.openlibrary.org/b/isbn/${isbn13}-L.jpg` : '',
+    isbn10 ? `https://covers.openlibrary.org/b/isbn/${isbn10}-L.jpg` : '',
+    coverUrl,
+  ].filter(Boolean)
+
+  const proxyCandidates: string[] = [coverUrl, fallbackUrl].filter(Boolean)
+
+  const [coverImg, appIconImg] = await Promise.all([
+    (async () => {
+      // Try direct fetch first (Open Library supports CORS)
+      for (const url of coverCandidates) {
+        const img = await fetchImg(url)
+        if (img) return img
+      }
+      // Fallback: go through our backend proxy (for Google Books etc.)
+      for (const url of proxyCandidates) {
+        const img = await fetchImgViaProxy(url)
+        if (img) return img
+      }
+      return null
+    })(),
+    loadLocalImg(appIconUrl),
+  ])
+
+  // ── Background : blurred cover or dark gradient ──
+  if (coverImg) {
+    ctx.save()
+    ctx.filter = 'blur(52px) brightness(0.25) saturate(1.5)'
+    const scale = Math.max(W / coverImg.width, H / coverImg.height)
+    const bw = coverImg.width * scale, bh = coverImg.height * scale
+    ctx.drawImage(coverImg, (W - bw) / 2, (H - bh) / 2, bw, bh)
+    ctx.restore()
+  } else {
+    const grad = ctx.createLinearGradient(0, 0, 0, H)
+    grad.addColorStop(0, '#0f172a')
+    grad.addColorStop(1, palette.bg + '88')
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, W, H)
+  }
+
+  // Vignette top + bottom
+  const vigTop = ctx.createLinearGradient(0, 0, 0, H * 0.35)
+  vigTop.addColorStop(0, 'rgba(0,0,0,0.85)')
+  vigTop.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.fillStyle = vigTop
+  ctx.fillRect(0, 0, W, H * 0.35)
+
+  const vigBot = ctx.createLinearGradient(0, H * 0.6, 0, H)
+  vigBot.addColorStop(0, 'rgba(0,0,0,0)')
+  vigBot.addColorStop(1, 'rgba(0,0,0,0.88)')
+  ctx.fillStyle = vigBot
+  ctx.fillRect(0, H * 0.6, W, H * 0.4)
+
+  // ── Header : app icon + JAILU wordmark ──
+  const ICON_SIZE = 80, ICON_R = 18
+  const iconX = (W - ICON_SIZE) / 2, iconY = 60
+
+  if (appIconImg) {
+    ctx.save()
+    drawRoundedRect(ctx, iconX, iconY, ICON_SIZE, ICON_SIZE, ICON_R)
+    ctx.clip()
+    ctx.drawImage(appIconImg, iconX, iconY, ICON_SIZE, ICON_SIZE)
+    ctx.restore()
+  } else {
+    // Fallback: indigo square with "J"
+    ctx.save()
+    drawRoundedRect(ctx, iconX, iconY, ICON_SIZE, ICON_SIZE, ICON_R)
+    ctx.fillStyle = '#6366f1'
+    ctx.fill()
+    ctx.fillStyle = '#fff'
+    ctx.font = `bold 48px system-ui`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('J', W / 2, iconY + ICON_SIZE / 2)
+    ctx.restore()
+  }
+
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'top'
+  ctx.font = `bold 64px system-ui, -apple-system, sans-serif`
+  ctx.fillStyle = '#ffffff'
+  ctx.fillText('JAILU', W / 2, iconY + ICON_SIZE + 20)
+
+  // Subtitle
+  ctx.font = `500 36px system-ui, -apple-system, sans-serif`
+  ctx.fillStyle = 'rgba(165,180,252,0.90)'
+  ctx.fillText('Recommandation de lecture', W / 2, iconY + ICON_SIZE + 104)
+
+  // ── Book cover ──
+  const CW = 400, CH = 600
+  const CX = (W - CW) / 2
+  const CY = iconY + ICON_SIZE + 164
+
+  ctx.save()
+  ctx.shadowColor = 'rgba(0,0,0,0.75)'
+  ctx.shadowBlur = 80
+  ctx.shadowOffsetY = 24
+  drawRoundedRect(ctx, CX, CY, CW, CH, 20)
+  ctx.fillStyle = '#1e293b'
+  ctx.fill()
+  ctx.restore()
+
+  ctx.save()
+  drawRoundedRect(ctx, CX, CY, CW, CH, 20)
+  ctx.clip()
+  if (coverImg) {
+    const scale = Math.max(CW / coverImg.width, CH / coverImg.height)
+    const iw = coverImg.width * scale, ih = coverImg.height * scale
+    ctx.drawImage(coverImg, CX + (CW - iw) / 2, CY + (CH - ih) / 2, iw, ih)
+  } else {
+    ctx.fillStyle = palette.bg
+    ctx.fillRect(CX, CY, CW, CH)
+    ctx.fillStyle = palette.fg + 'aa'
+    ctx.font = `bold ${CW * 0.45}px system-ui`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(title[0]?.toUpperCase() ?? '?', CX + CW / 2, CY + CH / 2)
+  }
+  ctx.restore()
+
+  // ── Book info below cover ──
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'top'
+  let y = CY + CH + 52
+
+  ctx.fillStyle = '#ffffff'
+  ctx.font = `bold 54px system-ui, -apple-system, sans-serif`
+  const titleLines = wrapText(ctx, title, W / 2, y, W - 120, 66, 2)
+  y += titleLines * 66 + 18
+
+  ctx.fillStyle = 'rgba(255,255,255,0.55)'
+  ctx.font = `36px system-ui, -apple-system, sans-serif`
+  ctx.fillText(authors[0] ?? '', W / 2, y)
+  y += 50
+
+  if (rating !== null) {
+    const starSize = 48, gap = 8
+    const totalW = 5 * starSize + 4 * gap
+    let sx = (W - totalW) / 2
+    for (let i = 1; i <= 5; i++) {
+      const full = rating >= i, half = !full && rating >= i - 0.5
+      ctx.font = `${starSize}px system-ui`
+      ctx.textAlign = 'left'
+      ctx.textBaseline = 'top'
+      ctx.fillStyle = '#334155'
+      ctx.fillText('★', sx, y)
+      if (full || half) {
+        if (half) {
+          ctx.save(); ctx.beginPath()
+          ctx.rect(sx, y, starSize / 2, starSize); ctx.clip()
+        }
+        ctx.fillStyle = '#fbbf24'
+        ctx.fillText('★', sx, y)
+        if (half) ctx.restore()
+      }
+      sx += starSize + gap
+    }
+  }
+
+  // ── Footer : attribution ──
+  if (username) {
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'bottom'
+    ctx.fillStyle = 'rgba(255,255,255,0.75)'
+    ctx.font = `500 36px system-ui, -apple-system, sans-serif`
+    ctx.fillText(`de la part de @${username}`, W / 2, H - 60)
+  }
+
+  return new Promise((resolve) => {
+    try {
+      canvas.toBlob(
+        (blob) => resolve(blob ? new File([blob], 'jailu-livre.jpg', { type: 'image/jpeg' }) : null),
+        'image/jpeg', 0.92,
+      )
+    } catch {
+      resolve(null)
+    }
+  })
+}
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { storage, auth } from '../lib/firebase'
 import { updateBook, deleteBook, updateBookCover, createStory } from '../lib/firestore'
@@ -11,6 +295,7 @@ interface BookDetailModalProps {
   onClose: () => void
   onUpdated: () => void
   readOnly?: boolean
+  username?: string
 }
 
 const STATUSES: BookStatus[] = ['read', 'reading', 'to_read']
@@ -103,7 +388,49 @@ function ReadOnlyStars({ rating }: { rating: number }) {
   )
 }
 
-export default function BookDetailModal({ book, onClose, onUpdated, readOnly = false }: BookDetailModalProps) {
+
+const MONTHS_FR = [
+  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
+]
+
+function MonthYearPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const currentYear = new Date().getFullYear()
+  const years = Array.from({ length: currentYear - 1899 }, (_, i) => currentYear - i)
+  const selMonth = value ? value.split('-')[1] ?? '' : ''
+  const selYear = value ? value.split('-')[0] ?? '' : ''
+
+  const handleMonth = (m: string) => {
+    const y = selYear || String(currentYear)
+    onChange(m ? `${y}-${m}` : '')
+  }
+  const handleYear = (y: string) => {
+    const m = selMonth || String(new Date().getMonth() + 1).padStart(2, '0')
+    onChange(y ? `${y}-${m}` : '')
+  }
+
+  const selectClass =
+    'flex-1 rounded-xl bg-slate-700/60 px-3 py-2.5 text-sm text-white outline-none ring-1 ring-white/5 transition focus:ring-indigo-500/60 appearance-none'
+
+  return (
+    <div className="flex gap-2">
+      <select value={selMonth} onChange={(e) => handleMonth(e.target.value)} className={selectClass} style={{ colorScheme: 'dark' }}>
+        <option value="">Mois</option>
+        {MONTHS_FR.map((m, i) => (
+          <option key={i} value={String(i + 1).padStart(2, '0')}>{m}</option>
+        ))}
+      </select>
+      <select value={selYear} onChange={(e) => handleYear(e.target.value)} className={`${selectClass} max-w-[96px]`} style={{ colorScheme: 'dark' }}>
+        <option value="">Année</option>
+        {years.map((y) => (
+          <option key={y} value={String(y)}>{y}</option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
+export default function BookDetailModal({ book, onClose, onUpdated, readOnly = false, username }: BookDetailModalProps) {
   const [status, setStatus] = useState<BookStatus>(book.status)
   const [rating, setRating] = useState<number | null>(book.rating)
   const [notes, setNotes] = useState(book.notes ?? '')
@@ -156,15 +483,38 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
     }
   }
 
+  const [isGeneratingCard, setIsGeneratingCard] = useState(false)
+
   const handleShare = async () => {
-    const authorStr = book.authors.join(', ')
-    const ratingStr = rating ? ` · ${rating}/5 ⭐` : ''
-    const text = `Je t'ai recommandé "${book.title}" de ${authorStr}${ratingStr} 📚\n\nDécouvre JAILU, l'app pour suivre tes lectures :`
-    const url = 'https://jailu-prod.web.app'
-    if (navigator.share) {
-      try { await navigator.share({ title: book.title, text, url }) } catch { /* cancelled */ }
-    } else {
-      window.open(`https://wa.me/?text=${encodeURIComponent(text + '\n' + url)}`, '_blank', 'noopener')
+    setIsGeneratingCard(true)
+    try {
+      const file = await generateShareCard(
+        book.title,
+        book.authors,
+        toHttps(coverSrc),
+        toHttps(fallbackSrc),
+        rating,
+        palette,
+        username,
+        book.isbn13 ?? null,
+        book.isbn10 ?? null,
+      )
+
+      const shareText = `Recommandation de lecture via JAILU\nhttps://jailu-prod.web.app`
+
+      if (file && navigator.share && navigator.canShare?.({ files: [file] })) {
+        // Mobile: native share sheet with the generated image
+        await navigator.share({ files: [file], title: book.title, text: shareText }).catch(() => { /* cancelled */ })
+      } else if (file) {
+        // Desktop fallback: download the image
+        const url = URL.createObjectURL(file)
+        const a = document.createElement('a')
+        a.href = url; a.download = `jailu-${book.title.slice(0, 30).replace(/\s+/g, '-')}.jpg`
+        a.click()
+        URL.revokeObjectURL(url)
+      }
+    } finally {
+      setIsGeneratingCard(false)
     }
   }
 
@@ -405,13 +755,7 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
                   {finishedAtInput ? formatMonthYear(fromMonthInput(finishedAtInput)) : '—'}
                 </p>
               ) : (
-                <input
-                  type="month"
-                  value={finishedAtInput}
-                  onChange={(e) => setFinishedAtInput(e.target.value)}
-                  style={{ colorScheme: 'dark' }}
-                  className="block w-full min-w-0 max-w-full rounded-xl bg-slate-700/60 px-3 py-2 text-sm text-white outline-none ring-1 ring-white/5 transition focus:ring-indigo-500/60"
-                />
+                <MonthYearPicker value={finishedAtInput} onChange={setFinishedAtInput} />
               )}
             </div>
           )}
@@ -420,9 +764,15 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
           {book.description && (
             <div>
               <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Synopsis</p>
-              <p className={`text-sm leading-relaxed text-slate-400 ${showFullDesc ? '' : 'line-clamp-4'}`}>
-                {book.description}
-              </p>
+              <div
+                style={{
+                  maxHeight: showFullDesc ? '600px' : '96px',
+                  overflow: 'hidden',
+                  transition: 'max-height 0.3s ease',
+                }}
+              >
+                <p className="text-sm leading-relaxed text-slate-400">{book.description}</p>
+              </div>
               {book.description.length > 200 && (
                 <button
                   onClick={() => setShowFullDesc(!showFullDesc)}
@@ -533,11 +883,16 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
                 </button>
                 <button
                   onClick={() => void handleShare()}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-800/60 py-3 text-sm font-medium text-slate-300 ring-1 ring-white/5 transition hover:bg-slate-800 hover:text-white"
+                  disabled={isGeneratingCard}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-800/60 py-3 text-sm font-medium text-slate-300 ring-1 ring-white/5 transition hover:bg-slate-800 hover:text-white disabled:opacity-50"
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4 shrink-0">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-                  </svg>
+                  {isGeneratingCard ? (
+                    <div className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-slate-500 border-t-white" />
+                  ) : (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4 shrink-0">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                    </svg>
+                  )}
                   Partager
                 </button>
               </div>

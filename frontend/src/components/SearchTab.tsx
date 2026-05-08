@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { searchBooks } from '../lib/api'
 import { addBook } from '../lib/firestore'
 import type { BookResult, BookStatus } from '../types/book'
@@ -104,20 +105,21 @@ export default function SearchTab({ onBookAdded }: SearchTabProps) {
         )}
       </div>
 
-      {bookToAdd !== null && (
-        <AddBookModal
-          book={bookToAdd}
-          onConfirm={isAdding ? () => undefined : handleConfirmAdd}
-          onClose={() => setBookToAdd(null)}
-        />
-      )}
-
       {showScan && <ScanModal onScan={handleScan} onClose={() => setShowScan(false)} />}
       {showManual && (
         <ManualAddModal
           onAdded={() => { onBookAdded(); setShowManual(false) }}
           onClose={() => setShowManual(false)}
         />
+      )}
+
+      {bookToAdd !== null && createPortal(
+        <AddBookModal
+          book={bookToAdd}
+          onConfirm={isAdding ? () => undefined : handleConfirmAdd}
+          onClose={() => setBookToAdd(null)}
+        />,
+        document.body
       )}
     </div>
   )

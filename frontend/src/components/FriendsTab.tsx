@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   searchUserByUsername,
   sendFriendRequest,
@@ -76,6 +77,9 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
   const [showLeaderboard, setShowLeaderboard] = useState(false)
   const [selectedRec, setSelectedRec] = useState<Recommendation | null>(null)
   const [addingRec, setAddingRec] = useState(false)
+  const [recDescription, setRecDescription] = useState<string | null>(null)
+  const [loadingDesc, setLoadingDesc] = useState(false)
+  const [showRecFullDesc, setShowRecFullDesc] = useState(false)
 
   useEffect(() => {
     const unsubReqs = subscribeToPendingRequests((reqs) => {
@@ -101,6 +105,36 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
       setMyStories(s.map((story) => ({ ...story, fromUsername: myProfile.username })))
     )
   }, [myProfile.username])
+
+  useEffect(() => {
+    if (selectedRec) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [selectedRec])
+
+  useEffect(() => {
+    if (!selectedRec) { setRecDescription(null); setShowRecFullDesc(false); return }
+    const id = selectedRec.googleBooksId
+    if (!id) return
+    setLoadingDesc(true)
+    fetch(`https://www.googleapis.com/books/v1/volumes/${id}`)
+      .then((r) => r.json())
+      .then((data) => {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        const raw = (data?.volumeInfo?.description as string | undefined) ?? null
+        // Strip HTML tags
+        const clean = raw ? raw.replace(/<[^>]+>/g, '').replace(/&[a-z]+;/gi, (m) => {
+          const map: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" }
+          return map[m] ?? m
+        }) : null
+        setRecDescription(clean)
+      })
+      .catch(() => setRecDescription(null))
+      .finally(() => setLoadingDesc(false))
+  }, [selectedRec])
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -215,12 +249,38 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
           }}
         />
       )}
-      {/* Recommendation detail modal */}
-      {selectedRec && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60" onClick={() => setSelectedRec(null)}>
-          <div className="w-full max-w-sm rounded-t-2xl bg-slate-800 p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-start gap-4 mb-5">
-              <div className="h-20 w-14 shrink-0 overflow-hidden rounded-xl bg-slate-700 shadow-lg">
+      {/* Recommendation detail modal — portal to body to escape stacking context */}
+      {selectedRec && createPortal(
+        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/70" onClick={() => setSelectedRec(null)}>
+          <div
+            className="w-full max-w-sm rounded-t-2xl bg-slate-900 flex flex-col"
+            style={{ maxHeight: '80vh' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Handle bar */}
+            <div className="flex justify-center pt-3 pb-2 shrink-0">
+              <div className="h-1 w-10 rounded-full bg-slate-700" />
+            </div>
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 pb-3 shrink-0">
+              <p className="text-xs font-semibold text-indigo-400 uppercase tracking-widest">
+                @{selectedRec.fromUsername} recommande
+              </p>
+              <button
+                onClick={() => setSelectedRec(null)}
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-800 text-slate-400 hover:text-white transition"
+                aria-label="Fermer"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-3.5 w-3.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Book info */}
+            <div className="flex items-start gap-4 px-5 pb-4 shrink-0">
+              <div className="h-20 w-14 shrink-0 overflow-hidden rounded-xl bg-slate-800 shadow-xl ring-1 ring-white/10">
                 <img
                   src={toHttps(selectedRec.bookThumbnailUrl ?? selectedRec.bookCoverUrl)}
                   alt={selectedRec.bookTitle}
@@ -229,29 +289,57 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
                 />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-xs text-indigo-400 font-medium mb-1">Recommandé par @{selectedRec.fromUsername}</p>
-                <p className="text-base font-bold text-white leading-tight">{selectedRec.bookTitle}</p>
-                <p className="text-xs text-slate-400 mt-0.5">{selectedRec.bookAuthors.join(', ')}</p>
+                <p className="text-sm font-bold text-white leading-tight">{selectedRec.bookTitle}</p>
+                <p className="text-xs text-slate-400 mt-1">{selectedRec.bookAuthors.join(', ')}</p>
                 {selectedRec.message && (
-                  <p className="mt-2 text-xs text-slate-400 italic">"{selectedRec.message}"</p>
+                  <p className="mt-2 text-xs text-slate-400 italic leading-relaxed">"{selectedRec.message}"</p>
                 )}
               </div>
             </div>
-            <button
-              onClick={() => void handleAddFromRec(selectedRec)}
-              disabled={addingRec}
-              className="mb-2 w-full rounded-xl bg-indigo-600 py-3 font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-50"
-            >
-              {addingRec ? 'Ajout...' : '+ Ajouter à ma liste'}
-            </button>
-            <button
-              onClick={() => { void deleteRecommendation(selectedRec.id); setSelectedRec(null) }}
-              className="w-full rounded-xl py-2.5 text-sm text-slate-400 transition hover:text-slate-200"
-            >
-              Ignorer
-            </button>
+
+            {/* Synopsis — scrollable middle zone, expands downward */}
+            <div className="flex-1 overflow-y-auto px-5 pb-3 min-h-0">
+              {loadingDesc ? (
+                <div className="flex justify-center py-2">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-700 border-t-indigo-500" />
+                </div>
+              ) : recDescription ? (
+                <>
+                  <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-600">Synopsis</p>
+                  <div
+                    style={{
+                      maxHeight: showRecFullDesc ? '600px' : '96px',
+                      overflow: 'hidden',
+                      transition: 'max-height 0.3s ease',
+                    }}
+                  >
+                    <p className="text-sm leading-relaxed text-slate-400">{recDescription}</p>
+                  </div>
+                  {recDescription.length > 200 && (
+                    <button
+                      onClick={() => setShowRecFullDesc((v) => !v)}
+                      className="mt-1.5 text-xs text-indigo-400 transition hover:text-indigo-300"
+                    >
+                      {showRecFullDesc ? '↑ Voir moins' : '↓ Voir plus'}
+                    </button>
+                  )}
+                </>
+              ) : null}
+            </div>
+
+            {/* Action — always pinned at bottom */}
+            <div className="shrink-0 px-5 pt-2 pb-8">
+              <button
+                onClick={() => void handleAddFromRec(selectedRec)}
+                disabled={addingRec}
+                className="w-full rounded-2xl bg-indigo-600 py-3.5 font-semibold text-white shadow-lg shadow-indigo-900/40 transition hover:bg-indigo-500 active:scale-[0.98] disabled:opacity-50"
+              >
+                {addingRec ? 'Ajout...' : '+ Ajouter à ma liste'}
+              </button>
+            </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Header + search */}
@@ -349,8 +437,8 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
 
       {/* Stories strip */}
       {storiesByUid.size > 0 && (
-        <div className="px-4 pb-3 sm:px-6">
-          <div className="flex gap-4 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-hide">
+        <div className="px-4 pt-1 pb-3 sm:px-6">
+          <div className="flex gap-4 overflow-x-auto pb-2 pt-1 -mx-4 px-4 scrollbar-hide">
             {/* My stories bubble */}
             {myStories.length > 0 && (() => {
               const hasUnseen = myStories.some((s) => !seenIds.has(s.id))
@@ -433,7 +521,7 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
                         </button>
                         <button
                           onClick={() => void deleteRecommendation(rec.id)}
-                          className="shrink-0 flex h-full items-center px-3 text-slate-600 hover:text-slate-400 transition"
+                          className="shrink-0 self-stretch flex items-center justify-center w-11 text-slate-600 hover:text-slate-400 transition"
                           aria-label="Ignorer"
                         >
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">

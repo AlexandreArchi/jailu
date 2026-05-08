@@ -72,7 +72,7 @@ export default function LibraryPage({ user }: LibraryPageProps) {
       <header className="shrink-0 border-b border-slate-800/80 px-4 pt-12 pb-3 sm:pt-6 sm:px-6">
         <div className="mx-auto flex max-w-lg items-center justify-between">
           <button
-            onClick={() => void loadBooks()}
+            onClick={() => window.location.reload()}
             className="flex items-center gap-2.5 transition active:scale-95"
             aria-label="Rafraîchir"
           >
@@ -146,6 +146,7 @@ export default function LibraryPage({ user }: LibraryPageProps) {
           book={bookToEdit}
           onClose={() => setBookToEdit(null)}
           onUpdated={() => void loadBooks()}
+          username={myProfile.username}
         />
       )}
 
