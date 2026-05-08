@@ -2,6 +2,28 @@ import { useMemo, useState, useRef, useEffect } from 'react'
 import type { UserBook } from '../types/book'
 import { coverPalette } from '../lib/coverColor'
 
+function MiniRating({ rating }: { rating: number }) {
+  const full = Math.floor(rating)
+  const half = rating % 1 >= 0.5
+  const empty = 5 - full - (half ? 1 : 0)
+  return (
+    <span className="flex items-center gap-px">
+      {Array.from({ length: full }).map((_, i) => (
+        <span key={`f${i}`} className="text-xs leading-none text-amber-400">★</span>
+      ))}
+      {half && (
+        <span className="relative inline-block text-xs leading-none">
+          <span className="text-slate-600">★</span>
+          <span className="absolute inset-0 text-amber-400" style={{ clipPath: 'inset(0 50% 0 0)' }}>★</span>
+        </span>
+      )}
+      {Array.from({ length: empty }).map((_, i) => (
+        <span key={`e${i}`} className="text-xs leading-none text-slate-700">★</span>
+      ))}
+    </span>
+  )
+}
+
 type SortKey = 'date' | 'rating' | 'title' | 'author'
 type ViewMode = 'list' | 'grid'
 
@@ -18,7 +40,7 @@ interface ReadTabProps {
   onShowStats: () => void
 }
 
-function BookRow({ book, onClick }: { book: UserBook; onClick: () => void }) {
+function BookRow({ book, onClick, showDate = false }: { book: UserBook; onClick: () => void; showDate?: boolean }) {
   const toHttps = (url: string) => url.replace('http://', 'https://')
   const [src, setSrc] = useState(toHttps(book.thumbnailUrl ?? book.coverUrl))
   const fallback = toHttps(book.thumbnailUrl ? book.coverUrl : '')
@@ -46,12 +68,8 @@ function BookRow({ book, onClick }: { book: UserBook; onClick: () => void }) {
         <p className="truncate text-sm font-semibold text-white">{book.title}</p>
         <p className="truncate text-xs text-slate-500 mt-0.5">{book.authors.join(', ')}</p>
         <div className="mt-1 flex items-center gap-2">
-          {book.rating !== null && (
-            <span className="text-xs text-amber-400 leading-none">
-              {'★'.repeat(Math.floor(book.rating))}{book.rating % 1 ? '½' : ''}
-            </span>
-          )}
-          {book.finishedAt && (
+          {book.rating !== null && <MiniRating rating={book.rating} />}
+          {showDate && book.finishedAt && (
             <span className="text-[10px] text-slate-600">
               {new Date(book.finishedAt).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })}
             </span>
@@ -272,7 +290,7 @@ export default function ReadTab({ books, onBookClick, onShowStats }: ReadTabProp
                   </p>
                 )}
                 {items.map((book) => (
-                  <BookRow key={book.id} book={book} onClick={() => onBookClick(book)} />
+                  <BookRow key={book.id} book={book} onClick={() => onBookClick(book)} showDate={!label} />
                 ))}
               </div>
             ))}

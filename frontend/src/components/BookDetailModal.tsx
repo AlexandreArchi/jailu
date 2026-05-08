@@ -156,6 +156,18 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
     }
   }
 
+  const handleShare = async () => {
+    const authorStr = book.authors.join(', ')
+    const ratingStr = rating ? ` · ${rating}/5 ⭐` : ''
+    const text = `Je t'ai recommandé "${book.title}" de ${authorStr}${ratingStr} 📚\n\nDécouvre JAILU, l'app pour suivre tes lectures :`
+    const url = 'https://jailu-prod.web.app'
+    if (navigator.share) {
+      try { await navigator.share({ title: book.title, text, url }) } catch { /* cancelled */ }
+    } else {
+      window.open(`https://wa.me/?text=${encodeURIComponent(text + '\n' + url)}`, '_blank', 'noopener')
+    }
+  }
+
   const handleDelete = async () => {
     if (!confirmDelete) { setConfirmDelete(true); return }
     setIsDeleting(true)
@@ -397,7 +409,8 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
                   type="month"
                   value={finishedAtInput}
                   onChange={(e) => setFinishedAtInput(e.target.value)}
-                  className="w-full rounded-xl bg-slate-700/60 px-3 py-2 text-sm text-white outline-none ring-1 ring-white/5 transition focus:ring-indigo-500/60"
+                  style={{ colorScheme: 'dark' }}
+                  className="block w-full min-w-0 max-w-full rounded-xl bg-slate-700/60 px-3 py-2 text-sm text-white outline-none ring-1 ring-white/5 transition focus:ring-indigo-500/60"
                 />
               )}
             </div>
@@ -508,15 +521,26 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
               >
                 {isSaving ? 'Enregistrement…' : 'Enregistrer'}
               </button>
-              <button
-                onClick={() => setShowRecommend(true)}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-800/60 py-3 text-sm font-medium text-slate-300 ring-1 ring-white/5 transition hover:bg-slate-800 hover:text-white"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
-                </svg>
-                Recommander à un ami
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowRecommend(true)}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-800/60 py-3 text-sm font-medium text-slate-300 ring-1 ring-white/5 transition hover:bg-slate-800 hover:text-white"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4 shrink-0">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
+                  </svg>
+                  Dans l'app
+                </button>
+                <button
+                  onClick={() => void handleShare()}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-800/60 py-3 text-sm font-medium text-slate-300 ring-1 ring-white/5 transition hover:bg-slate-800 hover:text-white"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4 shrink-0">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                  </svg>
+                  Partager
+                </button>
+              </div>
               <button
                 onClick={handleDelete}
                 disabled={isDeleting}
