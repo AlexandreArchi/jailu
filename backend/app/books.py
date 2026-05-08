@@ -199,6 +199,48 @@ def _build_queries(q: str) -> list[str]:
     return unique[:6]  # max 6 requêtes parallèles
 
 
+async def _fetch_open_library(isbn: str, client: httpx.AsyncClient) -> list[BookResult]:
+    """Fallback ISBN via Open Library quand Google Books échoue."""
+    url = f'https://openlibrary.org/api/books?bibkeys=ISBN:{isbn}&format=json&jscmd=data'
+    try:
+        resp = await client.get(url, timeout=8.0)
+        resp.raise_for_status()
+        data = resp.json()
+        book = data.get(f'ISBN:{isbn}')
+        if not book:
+            return []
+        title = book.get('title', '')
+        authors = [a['name'] for a in book.get('authors', []) if a.get('name')]
+        if not title or not authors:
+            return []
+        identifiers = book.get('identifiers', {})
+        isbn13 = next(iter(identifiers.get('isbn_13', [])), isbn if len(isbn) == 13 else None)
+        isbn10 = next(iter(identifiers.get('isbn_10', [])), None)
+        publisher_list = book.get('publishers', [])
+        publisher = publisher_list[0].get('name') if publisher_list else None
+        cover_url = f'https://covers.openlibrary.org/b/isbn/{isbn}-L.jpg?default=false'
+        thumbnail = book.get('cover', {}).get('medium') or None
+        return [BookResult(
+            google_books_id=f'ol_{isbn}',
+            isbn13=isbn13,
+            isbn10=isbn10,
+            title=title,
+            subtitle=None,
+            authors=authors,
+            publisher=publisher,
+            published_date=str(book.get('publish_date', '')),
+            page_count=book.get('number_of_pages'),
+            description=None,
+            cover_url=cover_url,
+            thumbnail_url=thumbnail,
+            categories=[],
+            language='fr',
+        )]
+    except Exception as e:
+        logger.warning('Open Library fallback error isbn=%s: %s', isbn, e)
+        return []
+
+
 async def _fetch(q: str, api_key: str, client: httpx.AsyncClient, max_results: int = 20) -> list[BookResult]:
     params = {
         'q': q,
@@ -236,6 +278,10 @@ async def search_books(query: str, api_key: str) -> list[BookResult]:
         isbn = _normalize_isbn(raw)
         if isbn:
             results = await _fetch(f'isbn:{isbn}', api_key, client, max_results=5)
+            if not results:
+                # Fallback Open Library si Google Books échoue (503, quota, etc.)
+                logger.info('Google Books vide pour isbn=%s, fallback Open Library', isbn)
+                results = await _fetch_open_library(isbn, client)
             if results:
                 _cache[cache_key] = (results, time.time())
                 return results
