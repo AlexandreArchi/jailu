@@ -468,3 +468,24 @@ export async function deleteMyStory(storyId: string): Promise<void> {
   if (!userId) return
   await deleteDoc(doc(db, 'users', userId, 'stories', storyId))
 }
+
+// ── public profile (no auth required) ────────────────────────────────────────
+
+export async function getProfileByUsername(username: string): Promise<UserProfile | null> {
+  const q = query(collection(db, 'users'), where('username', '==', username))
+  const snap = await getDocs(q)
+  if (snap.empty) return null
+  const d = snap.docs[0]
+  return {
+    uid: d.id,
+    username: d.data().username as string,
+    photoURL: (d.data().photoURL as string | null) ?? null,
+    createdAt: toDate(d.data().createdAt) ?? new Date(),
+  }
+}
+
+export async function getPublicBooks(uid: string): Promise<UserBook[]> {
+  const q = query(collection(db, 'users', uid, 'books'), orderBy('createdAt', 'desc'))
+  const snapshot = await getDocs(q)
+  return snapshot.docs.map(docToUserBook)
+}

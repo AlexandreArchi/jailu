@@ -3,6 +3,7 @@ import { onAuthStateChanged, type User } from 'firebase/auth'
 import { auth } from './lib/firebase'
 import LoginPage from './pages/LoginPage'
 import LibraryPage from './pages/LibraryPage'
+import PublicProfilePage from './components/PublicProfilePage'
 
 function useOnlineStatus() {
   const [isOnline, setIsOnline] = useState(navigator.onLine)
@@ -21,7 +22,7 @@ type AuthState =
   | { status: 'authenticated'; user: User }
   | { status: 'unauthenticated' }
 
-export default function App() {
+function AuthenticatedApp() {
   const [authState, setAuthState] = useState<AuthState>({ status: 'loading' })
   const isOnline = useOnlineStatus()
 
@@ -56,4 +57,14 @@ export default function App() {
       {authState.status === 'unauthenticated' && <LoginPage />}
     </>
   )
+}
+
+export default function App() {
+  // Public profile route — no auth needed, no Firebase initialised
+  const publicMatch = window.location.pathname.match(/^\/u\/([^/]+)\/?$/)
+  if (publicMatch) {
+    return <PublicProfilePage username={publicMatch[1]} />
+  }
+
+  return <AuthenticatedApp />
 }
