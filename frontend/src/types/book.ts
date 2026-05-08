@@ -41,6 +41,7 @@ export interface BookResult {
   cover_url: string
   thumbnail_url: string | null
   categories: string[]
+  language: string | null
 }
 
 export interface Story {
