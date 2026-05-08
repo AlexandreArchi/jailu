@@ -79,6 +79,19 @@ export default function PublicProfilePage({ username }: Props) {
   const totalPages = books.reduce((acc, b) => acc + (b.pageCount ?? 0), 0)
   const initial = profile?.username[0].toUpperCase() ?? '?'
 
+  // Tri par date de lecture desc, puis groupement par année
+  const sortedBooks = [...books].sort((a, b) => {
+    const dA = a.finishedAt ?? a.createdAt
+    const dB = b.finishedAt ?? b.createdAt
+    return dB.getTime() - dA.getTime()
+  })
+  const byYear: Record<number, typeof books> = {}
+  for (const book of sortedBooks) {
+    const year = (book.finishedAt ?? book.createdAt).getFullYear()
+    ;(byYear[year] ??= []).push(book)
+  }
+  const years = Object.keys(byYear).map(Number).sort((a, b) => b - a)
+
   // ── Loading ──
   if (status === 'loading') {
     return (
@@ -135,25 +148,34 @@ export default function PublicProfilePage({ username }: Props) {
         </div>
       </div>
 
-      {/* Books grid */}
+      {/* Books grid with year separators */}
       {books.length === 0 ? (
         <div className="px-6 pt-4 text-center text-sm text-slate-500">
           Aucun livre lu pour l'instant.
         </div>
       ) : (
-        <div className="px-4 sm:px-6">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-            {books.map((book) => (
-              <div key={book.id} className="flex flex-col gap-1.5">
-                <BookCover book={book} />
-                <p className="text-xs font-semibold text-white leading-tight line-clamp-2">{book.title}</p>
-                <p className="text-[11px] text-slate-400 leading-tight line-clamp-1">
-                  {book.authors.join(', ')}
-                </p>
-                {book.rating !== null && <StarRating rating={book.rating} />}
+        <div className="px-4 sm:px-6 space-y-6">
+          {years.map((year) => (
+            <div key={year}>
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-sm font-bold text-slate-400">{year}</span>
+                <div className="flex-1 h-px bg-slate-800" />
+                <span className="text-xs text-slate-600">{byYear[year].length} livre{byYear[year].length > 1 ? 's' : ''}</span>
               </div>
-            ))}
-          </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                {byYear[year].map((book) => (
+                  <div key={book.id} className="flex flex-col gap-1.5">
+                    <BookCover book={book} />
+                    <p className="text-xs font-semibold text-white leading-tight line-clamp-2">{book.title}</p>
+                    <p className="text-[11px] text-slate-400 leading-tight line-clamp-1">
+                      {book.authors.join(', ')}
+                    </p>
+                    {book.rating !== null && <StarRating rating={book.rating} />}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -174,14 +196,7 @@ export default function PublicProfilePage({ username }: Props) {
 function LogoMark() {
   return (
     <div className="flex items-center gap-2">
-      <svg viewBox="0 0 32 32" fill="none" className="h-7 w-7">
-        <rect width="32" height="32" rx="8" fill="#4F46E5" />
-        <path
-          d="M9 8h9a5 5 0 010 10H9V8zm0 10h10a5 5 0 010 10H9V18z"
-          fill="white"
-          opacity="0.9"
-        />
-      </svg>
+      <img src="/app-icon.svg" alt="JAILU" className="h-8 w-8 rounded-xl" />
       <span className="text-lg font-bold tracking-tight text-white">JAILU</span>
     </div>
   )

@@ -23,35 +23,36 @@ function normalizeTitle(t: string): string {
     .trim()
 }
 
+// Même normalisation pour les auteurs : gère les apostrophes typographiques,
+// accents, etc. → "Jean d'Ormesson" === "Jean d'Ormesson"
+const normalizeAuthor = normalizeTitle
+
+function bookKey(title: string, author: string): string {
+  return `${normalizeTitle(title)}|${normalizeAuthor(author)}`
+}
+
 /** True if this search result is already in the user's library (any edition). */
 function isOwned(book: BookResult, ownedIds: Set<string>, library: UserBook[]): boolean {
   if (ownedIds.has(book.google_books_id)) return true
   // Same ISBN → same book, different edition
   if (book.isbn13 && library.some((b) => b.isbn13 === book.isbn13)) return true
   if (book.isbn10 && library.some((b) => b.isbn10 === book.isbn10)) return true
-  // Same normalised title + first author
-  const normTitle = normalizeTitle(book.title)
-  const firstAuthor = book.authors[0]?.toLowerCase() ?? ''
-  return library.some(
-    (b) =>
-      normalizeTitle(b.title) === normTitle &&
-      (b.authors[0]?.toLowerCase() ?? '') === firstAuthor,
-  )
+  // Same normalised title + normalised first author (gère les variantes d'apostrophes)
+  const key = bookKey(book.title, book.authors[0] ?? '')
+  return library.some((b) => bookKey(b.title, b.authors[0] ?? '') === key)
 }
 
 /** True if we've already picked this book (dedup across query results). */
 function isDuplicate(book: BookResult, seen: Set<string>): boolean {
   if (seen.has(book.google_books_id)) return true
   if (book.isbn13 && seen.has(`isbn13:${book.isbn13}`)) return true
-  const key = `${normalizeTitle(book.title)}|${book.authors[0]?.toLowerCase() ?? ''}`
-  return seen.has(key)
+  return seen.has(bookKey(book.title, book.authors[0] ?? ''))
 }
 
 function markSeen(book: BookResult, seen: Set<string>) {
   seen.add(book.google_books_id)
   if (book.isbn13) seen.add(`isbn13:${book.isbn13}`)
-  const key = `${normalizeTitle(book.title)}|${book.authors[0]?.toLowerCase() ?? ''}`
-  seen.add(key)
+  seen.add(bookKey(book.title, book.authors[0] ?? ''))
 }
 
 /**
