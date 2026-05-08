@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { UserBook } from '../types/book'
 import GoalBanner from './GoalBanner'
+import SuggestionsSection from './SuggestionsSection'
 import { coverPalette } from '../lib/coverColor'
 
 function MiniRating({ rating }: { rating: number }) {
@@ -33,6 +34,7 @@ interface HomeTabProps {
   onGoToTab: (tab: 'to_read' | 'read') => void
   onShowStats: () => void
   onGoToSearch: () => void
+  onBookAdded: () => void
   goal: { year: number; target: number } | null | undefined
   onGoalChange: (goal: { year: number; target: number } | null) => void
 }
@@ -110,7 +112,7 @@ function LastReadItem({ book, onClick }: { book: UserBook; onClick: () => void }
   )
 }
 
-export default function HomeTab({ books, isLoading, displayName, onBookClick, onGoToTab, onShowStats, onGoToSearch, goal, onGoalChange }: HomeTabProps) {
+export default function HomeTab({ books, isLoading, displayName, onBookClick, onGoToTab, onShowStats, onGoToSearch, onBookAdded, goal, onGoalChange }: HomeTabProps) {
   const toRead = books.filter((b) => b.status === 'to_read')
   const reading = books.filter((b) => b.status === 'reading')
   const read = books.filter((b) => b.status === 'read')
@@ -198,6 +200,11 @@ export default function HomeTab({ books, isLoading, displayName, onBookClick, on
             <p className="mt-1.5 text-[10px] text-emerald-300/60">Voir les stats →</p>
           </button>
         </div>
+
+        {/* Suggestions */}
+        {!isLoading && read.length >= 1 && (
+          <SuggestionsSection books={books} onBookAdded={onBookAdded} />
+        )}
 
         {/* En cours */}
         {reading.length > 0 && (
