@@ -71,10 +71,14 @@ export default function LibraryPage({ user }: LibraryPageProps) {
     <div className="flex h-screen flex-col bg-slate-950 text-white">
       <header className="shrink-0 border-b border-slate-800/80 px-4 pt-12 pb-3 sm:pt-6 sm:px-6">
         <div className="mx-auto flex max-w-lg items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <img src="/favicon.svg" alt="" className="h-8 w-8 rounded-xl" />
+          <button
+            onClick={() => void loadBooks()}
+            className="flex items-center gap-2.5 transition active:scale-95"
+            aria-label="Rafraîchir"
+          >
+            <img src="/app-icon.svg" alt="JAILU" className="h-8 w-8 rounded-xl" />
             <span className="text-xl font-bold tracking-tight text-white">JAILU</span>
-          </div>
+          </button>
           <button
             onClick={() => setShowProfile(true)}
             className="flex items-center gap-2 rounded-xl bg-slate-800/60 px-3 py-1.5 ring-1 ring-white/5 transition hover:bg-slate-800"

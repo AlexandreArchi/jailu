@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { storage, auth } from '../lib/firebase'
-import { addManualBook, createStory } from '../lib/firestore'
+import { addManualBook } from '../lib/firestore'
 import type { BookStatus } from '../types/book'
 
 interface Props {
@@ -47,12 +47,6 @@ export default function ManualAddModal({ onAdded, onClose }: Props) {
       const finishedAt =
         status === 'read' && finishedDate ? new Date(finishedDate + 'T12:00:00') : undefined
       await addManualBook({ title: title.trim(), authors: authorList, coverUrl }, status, finishedAt)
-      if (status === 'read') {
-        void createStory(
-          { title: title.trim(), authors: authorList, coverUrl, thumbnailUrl: null, googleBooksId: null },
-          null,
-        )
-      }
       onAdded()
       onClose()
     } finally {

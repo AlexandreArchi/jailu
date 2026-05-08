@@ -59,25 +59,23 @@ function StarRating({ value, onChange }: { value: number | null; onChange: (v: n
   )
 }
 
-function toInputDate(d: Date | null): string {
+// Month/year helpers (type="month" uses YYYY-MM)
+function toMonthInput(d: Date | null): string {
   if (!d) return ''
-  const date = new Date(d)
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
+  const y = new Date(d).getFullYear()
+  const m = String(new Date(d).getMonth() + 1).padStart(2, '0')
+  return `${y}-${m}`
 }
 
-function fromInputDate(s: string): Date | null {
+function fromMonthInput(s: string): Date | null {
   if (!s) return null
-  const d = new Date(s)
+  const d = new Date(s + '-01T12:00:00')
   return isNaN(d.getTime()) ? null : d
 }
 
-function readingDays(start: Date | null, end: Date | null): number | null {
-  if (!start || !end) return null
-  const diff = new Date(end).getTime() - new Date(start).getTime()
-  return Math.max(1, Math.round(diff / (1000 * 60 * 60 * 24)))
+function formatMonthYear(d: Date | null): string {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
 }
 
 function ReadOnlyStars({ rating }: { rating: number }) {
@@ -109,14 +107,14 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
   const [status, setStatus] = useState<BookStatus>(book.status)
   const [rating, setRating] = useState<number | null>(book.rating)
   const [notes, setNotes] = useState(book.notes ?? '')
-  const [startedAtInput, setStartedAtInput] = useState(toInputDate(book.startedAt))
-  const [finishedAtInput, setFinishedAtInput] = useState(toInputDate(book.finishedAt))
+  const [finishedAtInput, setFinishedAtInput] = useState(toMonthInput(book.finishedAt))
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [showFullDesc, setShowFullDesc] = useState(false)
   const [isUploadingCover, setIsUploadingCover] = useState(false)
   const [showRecommend, setShowRecommend] = useState(false)
+  const [showStoryPrompt, setShowStoryPrompt] = useState(false)
   const [quotes, setQuotes] = useState<string[]>(book.quotes ?? [])
   const [newQuote, setNewQuote] = useState('')
   const coverFileRef = useRef<HTMLInputElement>(null)
@@ -125,10 +123,6 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
   const toHttps = (url: string) => url.replace('http://', 'https://')
   const [coverSrc, setCoverSrc] = useState(toHttps(book.coverUrl))
   const fallbackSrc = toHttps(book.thumbnailUrl ?? '')
-
-  const startedAt = fromInputDate(startedAtInput)
-  const finishedAt = fromInputDate(finishedAtInput)
-  const days = readingDays(startedAt, finishedAt)
   const palette = coverPalette(book.title)
 
   const handleCoverUpload = async (file: File) => {
@@ -148,22 +142,18 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
 
   const handleSave = async () => {
     setIsSaving(true)
-    const extra: { startedAt?: Date | null; finishedAt?: Date | null } = {
-      startedAt,
-      finishedAt,
-    }
-    if (!startedAt && status === 'reading') extra.startedAt = new Date()
+    const becomingRead = status === 'read' && book.status !== 'read'
+    const finishedAt = fromMonthInput(finishedAtInput)
+    const extra: { finishedAt?: Date | null } = { finishedAt }
     if (!finishedAt && status === 'read') extra.finishedAt = new Date()
     await updateBook(book.id, { status, rating, notes: notes.trim() || null, quotes, ...extra })
-    if (status === 'read' && book.status !== 'read') {
-      void createStory(
-        { title: book.title, authors: book.authors, coverUrl: book.coverUrl, thumbnailUrl: book.thumbnailUrl, googleBooksId: book.googleBooksId },
-        rating,
-      )
-    }
     setIsSaving(false)
     onUpdated()
-    onClose()
+    if (becomingRead) {
+      setShowStoryPrompt(true)
+    } else {
+      onClose()
+    }
   }
 
   const handleDelete = async () => {
@@ -180,9 +170,54 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm overflow-hidden rounded-t-[28px] bg-slate-950 max-h-[92vh] flex flex-col sm:rounded-[28px]"
+        className="relative w-full max-w-sm overflow-hidden rounded-t-[28px] bg-slate-950 max-h-[92vh] flex flex-col sm:rounded-[28px]"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* ── Story sharing prompt ── */}
+        {showStoryPrompt && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-6 bg-slate-950/96 px-8 text-center backdrop-blur-sm">
+            <div className="h-32 w-22 overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/10"
+              style={{ width: '88px', height: '128px' }}>
+              {coverSrc ? (
+                <img src={coverSrc} alt={book.title} className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center" style={{ background: palette.bg }}>
+                  <span className="text-3xl font-bold opacity-60" style={{ color: palette.fg }}>
+                    {book.title[0]?.toUpperCase()}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div>
+              <p className="text-lg font-bold text-white">Partager ta lecture ?</p>
+              <p className="mt-1.5 text-sm leading-relaxed text-slate-400">
+                Tes amis verront que tu as terminé<br />
+                <span className="font-semibold text-white">"{book.title}"</span>
+              </p>
+            </div>
+            <div className="flex w-full flex-col gap-2.5">
+              <button
+                onClick={() => {
+                  void createStory(
+                    { title: book.title, authors: book.authors, coverUrl: book.coverUrl, thumbnailUrl: book.thumbnailUrl, googleBooksId: book.googleBooksId },
+                    rating,
+                  )
+                  onClose()
+                }}
+                className="w-full rounded-2xl bg-indigo-600 py-3.5 font-semibold text-white shadow-lg shadow-indigo-900/40 transition hover:bg-indigo-500 active:scale-[0.98]"
+              >
+                Partager en story ✨
+              </button>
+              <button
+                onClick={onClose}
+                className="w-full rounded-2xl py-2.5 text-sm text-slate-500 transition hover:text-slate-300"
+              >
+                Pas maintenant
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ── Hero ── */}
         <div className="relative shrink-0 overflow-hidden px-5 pb-6 pt-14">
           {/* Blurred cover background */}
@@ -311,8 +346,7 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
                   key={s}
                   onClick={() => {
                     setStatus(s)
-                    if (s === 'read' && !finishedAtInput) setFinishedAtInput(toInputDate(new Date()))
-                    if (s === 'reading' && !startedAtInput) setStartedAtInput(toInputDate(new Date()))
+                    if (s === 'read' && !finishedAtInput) setFinishedAtInput(toMonthInput(new Date()))
                   }}
                   className={`flex-1 rounded-xl py-2.5 text-sm font-medium transition active:scale-[0.97] ${
                     status === s
@@ -351,54 +385,20 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
           </div>
 
           {/* Journal de lecture */}
-          {(status !== 'to_read' || startedAtInput || finishedAtInput) && (
+          {(status === 'reading' || status === 'read' || finishedAtInput) && (
             <div className="rounded-2xl bg-slate-800/40 px-4 py-4 ring-1 ring-white/5">
-              <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Journal de lecture</p>
+              <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Terminé en</p>
               {readOnly ? (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <p className="text-[10px] text-slate-600 mb-1">Commencé le</p>
-                    <p className="text-sm font-medium text-slate-300">
-                      {startedAtInput
-                        ? new Date(startedAtInput).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
-                        : '—'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-slate-600 mb-1">Terminé le</p>
-                    <p className="text-sm font-medium text-slate-300">
-                      {finishedAtInput
-                        ? new Date(finishedAtInput).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
-                        : '—'}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="mb-1.5 block text-[10px] text-slate-500">Commencé le</label>
-                    <input
-                      type="date"
-                      value={startedAtInput}
-                      onChange={(e) => setStartedAtInput(e.target.value)}
-                      className="w-full rounded-xl bg-slate-700/60 px-3 py-2 text-sm text-white outline-none ring-1 ring-white/5 transition focus:ring-indigo-500/60"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-[10px] text-slate-500">Terminé le</label>
-                    <input
-                      type="date"
-                      value={finishedAtInput}
-                      onChange={(e) => setFinishedAtInput(e.target.value)}
-                      className="w-full rounded-xl bg-slate-700/60 px-3 py-2 text-sm text-white outline-none ring-1 ring-white/5 transition focus:ring-indigo-500/60"
-                    />
-                  </div>
-                </div>
-              )}
-              {days !== null && (
-                <p className="mt-3 text-xs font-medium text-indigo-400/80">
-                  ⏱ {days} jour{days > 1 ? 's' : ''} de lecture
+                <p className="text-sm font-medium text-slate-300">
+                  {finishedAtInput ? formatMonthYear(fromMonthInput(finishedAtInput)) : '—'}
                 </p>
+              ) : (
+                <input
+                  type="month"
+                  value={finishedAtInput}
+                  onChange={(e) => setFinishedAtInput(e.target.value)}
+                  className="w-full rounded-xl bg-slate-700/60 px-3 py-2 text-sm text-white outline-none ring-1 ring-white/5 transition focus:ring-indigo-500/60"
+                />
               )}
             </div>
           )}

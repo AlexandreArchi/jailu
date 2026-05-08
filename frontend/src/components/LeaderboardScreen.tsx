@@ -49,7 +49,7 @@ function computeStats(uid: string, username: string, isMe: boolean, books: UserB
 export default function LeaderboardScreen({ myProfile, friends, onClose, onFriendClick }: Props) {
   const [allBooks, setAllBooks] = useState<Map<string, UserBook[]>>(new Map())
   const [isLoading, setIsLoading] = useState(true)
-  const [selectedYear, setSelectedYear] = useState<number | null>(null)
+  const [selectedYear, setSelectedYear] = useState<number | null>(new Date().getFullYear())
   const [metric, setMetric] = useState<Metric>('books')
   const [selectedUids, setSelectedUids] = useState<Set<string>>(
     () => new Set([myProfile.uid, ...friends.map((f) => f.uid)])
@@ -71,12 +71,14 @@ export default function LeaderboardScreen({ myProfile, friends, onClose, onFrien
   }, [myProfile.uid, friends])
 
   const availableYears = useMemo(() => {
+    const currentYear = new Date().getFullYear()
     const years = new Set<number>()
     for (const books of allBooks.values()) {
       for (const b of books) {
         if (b.status !== 'read') continue
         const d = b.finishedAt ?? b.createdAt
-        years.add(new Date(d).getFullYear())
+        const y = new Date(d).getFullYear()
+        if (y >= currentYear - 2) years.add(y)
       }
     }
     return Array.from(years).sort((a, b) => b - a)
