@@ -15,9 +15,10 @@ import {
   addBook,
   getFriendsStories,
   getMyStories,
+  getFriendBooks,
   type FriendshipStatus,
 } from '../lib/firestore'
-import type { BookResult, FriendEntry, FriendRequest, Recommendation, Story, UserProfile } from '../types/book'
+import type { BookResult, FriendEntry, FriendRequest, Recommendation, Story, UserBook, UserProfile } from '../types/book'
 import FriendLibraryScreen from './FriendLibraryScreen'
 import LeaderboardScreen from './LeaderboardScreen'
 import StoryModal from './StoryModal'
@@ -73,6 +74,7 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
     catch { return new Set() }
   })
   const [isLoading, setIsLoading] = useState(true)
+  const [friendsReading, setFriendsReading] = useState<{ friend: FriendEntry; book: UserBook }[]>([])
   const [viewingFriend, setViewingFriend] = useState<FriendEntry | null>(null)
   const [showLeaderboard, setShowLeaderboard] = useState(false)
   const [selectedRec, setSelectedRec] = useState<Recommendation | null>(null)
@@ -105,6 +107,20 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
       setMyStories(s.map((story) => ({ ...story, fromUsername: myProfile.username })))
     )
   }, [myProfile.username])
+
+  useEffect(() => {
+    if (friends.length === 0) { setFriendsReading([]); return }
+    const candidates = friends.slice(0, 6) // fetch up to 6, keep first 3 with a reading book
+    void Promise.all(candidates.map((f) => getFriendBooks(f.uid))).then((results) => {
+      const reading: { friend: FriendEntry; book: UserBook }[] = []
+      for (let i = 0; i < candidates.length; i++) {
+        if (reading.length >= 3) break
+        const readingBook = results[i].find((b) => b.status === 'reading')
+        if (readingBook) reading.push({ friend: candidates[i], book: readingBook })
+      }
+      setFriendsReading(reading)
+    })
+  }, [friends])
 
   useEffect(() => {
     if (selectedRec) {
@@ -473,6 +489,50 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
                 </button>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Ce que lisent tes amis en ce moment */}
+      {friendsReading.length > 0 && (
+        <div className="px-4 sm:px-6 pb-3">
+          <h2 className="mb-2.5 text-sm font-semibold text-white">📖 Ce que lisent tes amis</h2>
+          <div className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-hide">
+            {friendsReading.map(({ friend, book }) => (
+              <button
+                key={friend.uid}
+                onClick={() => setViewingFriend(friend)}
+                className="flex shrink-0 flex-col gap-2 w-32 text-left transition active:scale-[0.97]"
+              >
+                {/* Cover */}
+                <div className="aspect-[2/3] w-full overflow-hidden rounded-xl bg-slate-800 ring-1 ring-white/5 shadow-lg">
+                  {book.coverUrl || book.thumbnailUrl ? (
+                    <img
+                      src={book.coverUrl || book.thumbnailUrl!}
+                      alt={book.title}
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        const img = e.target as HTMLImageElement
+                        if (book.thumbnailUrl && img.src !== book.thumbnailUrl) {
+                          img.src = book.thumbnailUrl
+                        } else {
+                          img.style.display = 'none'
+                        }
+                      }}
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center p-2">
+                      <span className="text-center text-[9px] text-slate-500 leading-tight">{book.title}</span>
+                    </div>
+                  )}
+                </div>
+                {/* Meta */}
+                <div>
+                  <p className="text-[10px] font-semibold text-indigo-400 leading-tight">@{friend.username} lit</p>
+                  <p className="text-xs font-semibold text-white leading-tight line-clamp-2 mt-0.5">{book.title}</p>
+                </div>
+              </button>
+            ))}
           </div>
         </div>
       )}
