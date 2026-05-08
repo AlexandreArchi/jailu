@@ -205,6 +205,7 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
         cover_url: rec.bookCoverUrl,
         thumbnail_url: rec.bookThumbnailUrl,
         categories: [],
+        language: null,
       }
       await addBook(bookResult, 'to_read')
       await deleteRecommendation(rec.id)
