@@ -361,13 +361,12 @@ async def search_books(query: str, api_key: str) -> list[BookResult]:
 
         queries = queries[:6]
 
-        # Ajouter une variante langRestrict=fr sur la requête brute
-        # pour s'assurer que les éditions françaises sont dans le pool
-        fr_query = queries[0]  # requête brute (la plus précise)
-        logger.info('Requêtes pour "%s": %s + variante fr', cache_key, queries)
+        logger.info('Requêtes pour "%s": %s', cache_key, queries)
+        # La requête brute (queries[0]) cible les livres FR en priorité.
+        # Les variantes intitle:/inauthor: restent sans restriction (fallback).
         results_lists = await asyncio.gather(
-            *[_fetch(q, api_key, client) for q in queries],
-            _fetch(fr_query, api_key, client, lang_restrict='fr'),
+            _fetch(queries[0], api_key, client, lang_restrict='fr'),
+            *[_fetch(q, api_key, client) for q in queries[1:]],
         )
 
         seen: set[str] = set()

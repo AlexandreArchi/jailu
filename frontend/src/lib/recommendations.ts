@@ -155,8 +155,8 @@ export async function getRecommendations(library: UserBook[]): Promise<Suggestio
         const book = queryResults[i][queryIndices[i]++]
         if (isDuplicate(book, seen)) continue
         if (isOwned(book, ownedIds, library)) continue
-        // Skip books explicitly in English — évite les doublons version FR/EN
-        if (book.language === 'en') continue
+        // Suggestions : uniquement les livres explicitement en français
+        if (book.language !== 'fr') continue
 
         const authorKey = book.authors[0]?.toLowerCase() ?? '__unknown__'
         if ((countPerAuthor[authorKey] ?? 0) >= MAX_PER_AUTHOR) continue
