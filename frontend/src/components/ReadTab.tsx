@@ -26,10 +26,8 @@ function BookRow({ book, onClick }: { book: UserBook; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="flex w-full items-center gap-3 border-b border-slate-800/50 px-4 py-3 text-left transition-all duration-150 hover:bg-slate-800/40 active:bg-slate-800/70 active:scale-[0.99]"
+      className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-all duration-150 hover:bg-slate-800/50 active:scale-[0.99] active:bg-slate-800/70"
     >
-      <div className="w-1 self-stretch shrink-0 rounded-full bg-emerald-500/60" />
-
       <div className="h-16 w-11 shrink-0 overflow-hidden rounded-xl bg-slate-800 shadow-md">
         {src ? (
           <img src={src} alt={book.title} className="h-full w-full object-cover"
@@ -47,17 +45,18 @@ function BookRow({ book, onClick }: { book: UserBook; onClick: () => void }) {
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-white">{book.title}</p>
         <p className="truncate text-xs text-slate-500 mt-0.5">{book.authors.join(', ')}</p>
-        {book.rating !== null && (
-          <div className="mt-1 flex items-center gap-1">
-            <span className="text-xs text-amber-400">{'★'.repeat(book.rating)}{'☆'.repeat(5 - book.rating)}</span>
-            <span className="text-[10px] text-slate-600">{book.rating}/5</span>
-          </div>
-        )}
-        {book.finishedAt && (
-          <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-600">
-            Terminé le {new Date(book.finishedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
-          </p>
-        )}
+        <div className="mt-1 flex items-center gap-2">
+          {book.rating !== null && (
+            <span className="text-xs text-amber-400 leading-none">
+              {'★'.repeat(Math.floor(book.rating))}{book.rating % 1 ? '½' : ''}
+            </span>
+          )}
+          {book.finishedAt && (
+            <span className="text-[10px] text-slate-600">
+              {new Date(book.finishedAt).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })}
+            </span>
+          )}
+        </div>
       </div>
 
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4 shrink-0 text-slate-700">
@@ -264,18 +263,20 @@ export default function ReadTab({ books, onBookClick, onShowStats }: ReadTabProp
             ))}
           </div>
         ) : (
-          grouped.map(({ label, items }) => (
-            <div key={label ?? '_flat'}>
-              {label && (
-                <p className="px-4 py-2 text-xs font-semibold uppercase tracking-widest text-slate-500">
-                  {label}
-                </p>
-              )}
-              {items.map((book) => (
-                <BookRow key={book.id} book={book} onClick={() => onBookClick(book)} />
-              ))}
-            </div>
-          ))
+          <div className="px-2">
+            {grouped.map(({ label, items }) => (
+              <div key={label ?? '_flat'}>
+                {label && (
+                  <p className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-widest text-slate-600">
+                    {label}
+                  </p>
+                )}
+                {items.map((book) => (
+                  <BookRow key={book.id} book={book} onClick={() => onBookClick(book)} />
+                ))}
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>

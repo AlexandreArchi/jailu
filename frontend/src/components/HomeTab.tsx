@@ -56,14 +56,18 @@ function LastReadItem({ book, onClick }: { book: UserBook; onClick: () => void }
   return (
     <button
       onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-2xl bg-slate-800/50 px-3 py-3 text-left ring-1 ring-white/5 transition-all duration-150 hover:bg-slate-800 hover:ring-white/10 active:scale-[0.98]"
+      className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-all duration-150 hover:bg-slate-800/50 active:scale-[0.99] active:bg-slate-800/70"
     >
-      <div className="h-14 w-10 shrink-0 overflow-hidden rounded-xl bg-slate-700 shadow-md">
+      <div className="h-14 w-10 shrink-0 overflow-hidden rounded-xl bg-slate-800 shadow-md">
         {src ? (
           <img src={src} alt={book.title} className="h-full w-full object-cover"
             onError={() => { if (src !== fallback && fallback) setSrc(fallback); else setSrc('') }} />
         ) : (
-          <div className="h-full w-full bg-slate-700" />
+          <div className="flex h-full w-full items-center justify-center bg-slate-800">
+            <span className="text-lg font-bold opacity-60" style={{ color: '#a5b4fc' }}>
+              {book.title[0]?.toUpperCase()}
+            </span>
+          </div>
         )}
       </div>
       <div className="min-w-0 flex-1">
@@ -72,7 +76,7 @@ function LastReadItem({ book, onClick }: { book: UserBook; onClick: () => void }
       </div>
       {book.rating !== null && (
         <div className="shrink-0 flex items-center gap-0.5">
-          <span className="text-amber-400 text-sm">★</span>
+          <span className="text-amber-400 text-sm leading-none">★</span>
           <span className="text-xs font-semibold text-amber-400">{book.rating}</span>
         </div>
       )}

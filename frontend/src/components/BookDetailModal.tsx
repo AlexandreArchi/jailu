@@ -3,6 +3,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { storage, auth } from '../lib/firebase'
 import { updateBook, deleteBook, updateBookCover, createStory } from '../lib/firestore'
 import { BOOK_STATUS_LABELS, type BookStatus, type UserBook } from '../types/book'
+import { coverPalette } from '../lib/coverColor'
 import RecommendBookModal from './RecommendBookModal'
 
 interface BookDetailModalProps {
@@ -13,6 +14,16 @@ interface BookDetailModalProps {
 }
 
 const STATUSES: BookStatus[] = ['read', 'reading', 'to_read']
+const STATUS_COLORS: Record<BookStatus, string> = {
+  read: 'bg-emerald-600 shadow-emerald-900/50',
+  reading: 'bg-indigo-600 shadow-indigo-900/50',
+  to_read: 'bg-slate-600 shadow-black/20',
+}
+const STATUS_BADGE: Record<BookStatus, string> = {
+  read: 'bg-emerald-500/15 text-emerald-400',
+  reading: 'bg-indigo-500/15 text-indigo-400',
+  to_read: 'bg-slate-700/60 text-slate-400',
+}
 
 function StarRating({ value, onChange }: { value: number | null; onChange: (v: number | null) => void }) {
   const [hovered, setHovered] = useState<number | null>(null)
@@ -23,14 +34,11 @@ function StarRating({ value, onChange }: { value: number | null; onChange: (v: n
         const full = display >= star
         const half = !full && display >= star - 0.5
         return (
-          <div key={star} className="relative h-8 w-8" onMouseLeave={() => setHovered(null)}>
-            <span className="absolute inset-0 flex items-center justify-center text-2xl text-slate-600">★</span>
+          <div key={star} className="relative h-9 w-9" onMouseLeave={() => setHovered(null)}>
+            <span className="absolute inset-0 flex items-center justify-center text-[26px] text-slate-700">★</span>
             <span
-              className="absolute inset-0 flex items-center justify-center text-2xl text-amber-400"
-              style={{
-                opacity: full || half ? 1 : 0,
-                clipPath: half ? 'inset(0 50% 0 0)' : undefined,
-              }}
+              className="absolute inset-0 flex items-center justify-center text-[26px] text-amber-400 transition-opacity"
+              style={{ opacity: full || half ? 1 : 0, clipPath: half ? 'inset(0 50% 0 0)' : undefined }}
             >★</span>
             <button
               className="absolute left-0 top-0 h-full w-1/2"
@@ -72,6 +80,31 @@ function readingDays(start: Date | null, end: Date | null): number | null {
   return Math.max(1, Math.round(diff / (1000 * 60 * 60 * 24)))
 }
 
+function ReadOnlyStars({ rating }: { rating: number }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex">
+        {[1, 2, 3, 4, 5].map((star) => {
+          const full = rating >= star
+          const half = !full && rating >= star - 0.5
+          return (
+            <span key={star} className="relative text-2xl">
+              <span className="text-slate-700">★</span>
+              {(full || half) && (
+                <span
+                  className="absolute inset-0 text-amber-400"
+                  style={half ? { clipPath: 'inset(0 50% 0 0)' } : undefined}
+                >★</span>
+              )}
+            </span>
+          )
+        })}
+      </div>
+      <span className="text-sm font-semibold text-amber-400">{rating} / 5</span>
+    </div>
+  )
+}
+
 export default function BookDetailModal({ book, onClose, onUpdated, readOnly = false }: BookDetailModalProps) {
   const [status, setStatus] = useState<BookStatus>(book.status)
   const [rating, setRating] = useState<number | null>(book.rating)
@@ -88,6 +121,16 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
   const [newQuote, setNewQuote] = useState('')
   const coverFileRef = useRef<HTMLInputElement>(null)
 
+  const year = book.publishedDate?.split('-')[0]
+  const toHttps = (url: string) => url.replace('http://', 'https://')
+  const [coverSrc, setCoverSrc] = useState(toHttps(book.coverUrl))
+  const fallbackSrc = toHttps(book.thumbnailUrl ?? '')
+
+  const startedAt = fromInputDate(startedAtInput)
+  const finishedAt = fromInputDate(finishedAtInput)
+  const days = readingDays(startedAt, finishedAt)
+  const palette = coverPalette(book.title)
+
   const handleCoverUpload = async (file: File) => {
     const userId = auth.currentUser?.uid
     if (!userId) return
@@ -103,21 +146,12 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
     }
   }
 
-  const year = book.publishedDate?.split('-')[0]
-  const toHttps = (url: string) => url.replace('http://', 'https://')
-  const [coverSrc, setCoverSrc] = useState(toHttps(book.coverUrl))
-  const fallbackSrc = toHttps(book.thumbnailUrl ?? '')
-
-  const startedAt = fromInputDate(startedAtInput)
-  const finishedAt = fromInputDate(finishedAtInput)
-
   const handleSave = async () => {
     setIsSaving(true)
     const extra: { startedAt?: Date | null; finishedAt?: Date | null } = {
-      startedAt: startedAt,
-      finishedAt: finishedAt,
+      startedAt,
+      finishedAt,
     }
-    // Auto-set si vide et statut cohérent
     if (!startedAt && status === 'reading') extra.startedAt = new Date()
     if (!finishedAt && status === 'read') extra.finishedAt = new Date()
     await updateBook(book.id, { status, rating, notes: notes.trim() || null, quotes, ...extra })
@@ -140,323 +174,368 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
     onClose()
   }
 
-  const days = readingDays(startedAt, finishedAt)
-
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 sm:items-center"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm rounded-t-2xl bg-slate-800 sm:rounded-2xl overflow-hidden max-h-[90vh] flex flex-col"
+        className="w-full max-w-sm overflow-hidden rounded-t-[28px] bg-slate-950 max-h-[92vh] flex flex-col sm:rounded-[28px]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-end px-3 pt-3">
+        {/* ── Hero ── */}
+        <div className="relative shrink-0 overflow-hidden px-5 pb-6 pt-14">
+          {/* Blurred cover background */}
+          {coverSrc ? (
+            <img
+              src={coverSrc}
+              aria-hidden
+              className="absolute inset-0 h-full w-full scale-125 object-cover"
+              style={{ filter: 'blur(30px) brightness(0.22) saturate(1.8)' }}
+            />
+          ) : (
+            <div
+              className="absolute inset-0"
+              style={{ background: `linear-gradient(135deg, ${palette.bg}80 0%, transparent 65%)` }}
+            />
+          )}
+          {/* Top fade */}
+          <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/30 to-transparent" />
+          {/* Bottom fade to body */}
+          <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-b from-transparent to-slate-950" />
+
+          {/* Close button */}
           <button
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-slate-400 transition hover:bg-slate-600 hover:text-white"
+            className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white/70 backdrop-blur-sm transition hover:bg-black/70 hover:text-white"
             aria-label="Fermer"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-3.5 w-3.5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
-        </div>
-        <div className="flex gap-3 bg-slate-700 p-4">
-          {/* Cover — cliquable pour changer/ajouter si pas readOnly */}
-          <div className="relative shrink-0">
-            {coverSrc ? (
-              <img
-                src={coverSrc}
-                alt={book.title}
-                className="h-20 w-14 rounded-md object-cover"
-                onError={() => { if (coverSrc !== fallbackSrc && fallbackSrc) setCoverSrc(fallbackSrc); else setCoverSrc('') }}
-              />
-            ) : (
-              !readOnly && (
+
+          {/* Cover + book info */}
+          <div className="relative z-10 flex items-end gap-4">
+            {/* Cover */}
+            <div className="relative shrink-0">
+              <div className="h-36 w-24 overflow-hidden rounded-2xl bg-slate-800 shadow-[0_12px_40px_rgba(0,0,0,0.7)] ring-1 ring-white/10">
+                {coverSrc ? (
+                  <img
+                    src={coverSrc}
+                    alt={book.title}
+                    className="h-full w-full object-cover"
+                    onError={() => {
+                      if (coverSrc !== fallbackSrc && fallbackSrc) setCoverSrc(fallbackSrc)
+                      else setCoverSrc('')
+                    }}
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center" style={{ background: palette.bg }}>
+                    <span className="text-4xl font-bold opacity-60" style={{ color: palette.fg }}>
+                      {book.title[0]?.toUpperCase()}
+                    </span>
+                  </div>
+                )}
+              </div>
+              {/* Cover edit button */}
+              {!readOnly && (
                 <button
                   type="button"
                   onClick={() => coverFileRef.current?.click()}
-                  className="flex h-20 w-14 flex-col items-center justify-center gap-1 rounded-md bg-slate-600 ring-1 ring-dashed ring-slate-500 hover:ring-indigo-400 transition text-slate-400"
+                  disabled={isUploadingCover}
+                  className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 ring-2 ring-slate-950 text-slate-300 transition hover:text-white"
+                  aria-label={coverSrc ? 'Changer la couverture' : 'Ajouter une couverture'}
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="h-5 w-5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-                  </svg>
-                  <span className="text-[9px] text-center leading-tight px-0.5">Ajouter</span>
+                  {isUploadingCover ? (
+                    <div className="h-3 w-3 animate-spin rounded-full border border-slate-500 border-t-white" />
+                  ) : coverSrc ? (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-3.5 w-3.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-3.5 w-3.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                  )}
                 </button>
-              )
-            )}
-            {!readOnly && coverSrc && (
-              <button
-                type="button"
-                onClick={() => coverFileRef.current?.click()}
-                disabled={isUploadingCover}
-                className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full bg-slate-900/90 text-slate-300 hover:text-white transition"
-                aria-label="Changer la couverture"
-              >
-                {isUploadingCover ? (
-                  <div className="h-3 w-3 animate-spin rounded-full border border-slate-400 border-t-white" />
-                ) : (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-3.5 w-3.5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
-                  </svg>
-                )}
-              </button>
-            )}
-            <input
-              ref={coverFileRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleCoverUpload(f) }}
-            />
-          </div>
-          <div className="min-w-0 flex-1">
+              )}
+              <input
+                ref={coverFileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleCoverUpload(f) }}
+              />
+            </div>
 
-            <p className="font-semibold text-white leading-tight">{book.title}</p>
-            <p className="mt-0.5 text-sm text-slate-400">
-              {book.authors.join(', ')}{year ? ` · ${year}` : ''}
-            </p>
-            {book.pageCount && (
-              <p className="mt-0.5 text-xs text-slate-500">{book.pageCount} pages</p>
-            )}
-            {book.tags.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1">
-                {book.tags.slice(0, 3).map((tag) => (
-                  <span key={tag} className="rounded-full bg-slate-600/60 px-2 py-0.5 text-[10px] text-slate-300">
-                    {tag}
-                  </span>
-                ))}
+            {/* Text info */}
+            <div className="min-w-0 flex-1 pb-1">
+              <p className="text-lg font-bold leading-snug text-white">{book.title}</p>
+              {book.subtitle && (
+                <p className="mt-0.5 text-xs leading-tight text-white/50">{book.subtitle}</p>
+              )}
+              <p className="mt-1.5 text-sm text-white/60">{book.authors.join(', ')}</p>
+              <div className="mt-1 flex items-center gap-1.5 text-xs text-white/30">
+                {year && <span>{year}</span>}
+                {year && book.pageCount && <span>·</span>}
+                {book.pageCount && <span>{book.pageCount} pages</span>}
               </div>
-            )}
+              {book.tags.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {book.tags.slice(0, 2).map((tag) => (
+                    <span key={tag} className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium text-white/50">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="space-y-5 p-4 overflow-y-auto">
-          {/* Dates de lecture */}
-          <div className="space-y-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Dates de lecture</p>
-            {readOnly ? (
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-lg bg-slate-700/50 px-3 py-2">
-                  <p className="text-[10px] text-slate-500 mb-0.5">Commencé le</p>
-                  <p className="text-sm text-white">{startedAtInput ? new Date(startedAtInput).toLocaleDateString('fr-FR') : '—'}</p>
-                </div>
-                <div className="rounded-lg bg-slate-700/50 px-3 py-2">
-                  <p className="text-[10px] text-slate-500 mb-0.5">Terminé le</p>
-                  <p className="text-sm text-white">{finishedAtInput ? new Date(finishedAtInput).toLocaleDateString('fr-FR') : '—'}</p>
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="mb-1 block text-[10px] text-slate-500">Commencé le</label>
-                  <input
-                    type="date"
-                    value={startedAtInput}
-                    onChange={(e) => setStartedAtInput(e.target.value)}
-                    className="w-full rounded-lg bg-slate-700 px-2 py-1.5 text-sm text-white outline-none ring-1 ring-slate-600 focus:ring-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-[10px] text-slate-500">Terminé le</label>
-                  <input
-                    type="date"
-                    value={finishedAtInput}
-                    onChange={(e) => setFinishedAtInput(e.target.value)}
-                    className="w-full rounded-lg bg-slate-700 px-2 py-1.5 text-sm text-white outline-none ring-1 ring-slate-600 focus:ring-indigo-500"
-                  />
-                </div>
-              </div>
-            )}
-            {days !== null && (
-              <p className="text-xs font-medium text-indigo-400">{days} jour{days > 1 ? 's' : ''} de lecture</p>
-            )}
-          </div>
+        {/* ── Scrollable body ── */}
+        <div className="flex-1 overflow-y-auto px-5 pb-8 space-y-5">
 
-          {/* Statut */}
-          <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Statut</p>
-            {readOnly ? (
-              <span className="inline-block rounded-lg bg-indigo-600/20 px-3 py-1.5 text-sm font-medium text-indigo-300">
+          {/* Status */}
+          {readOnly ? (
+            <div className="flex justify-center">
+              <span className={`rounded-full px-4 py-1.5 text-sm font-semibold ${STATUS_BADGE[status]}`}>
                 {BOOK_STATUS_LABELS[status]}
               </span>
+            </div>
+          ) : (
+            <div className="flex rounded-2xl bg-slate-800/60 p-1 ring-1 ring-white/5">
+              {STATUSES.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => {
+                    setStatus(s)
+                    if (s === 'read' && !finishedAtInput) setFinishedAtInput(toInputDate(new Date()))
+                    if (s === 'reading' && !startedAtInput) setStartedAtInput(toInputDate(new Date()))
+                  }}
+                  className={`flex-1 rounded-xl py-2.5 text-sm font-medium transition active:scale-[0.97] ${
+                    status === s
+                      ? `${STATUS_COLORS[s]} text-white shadow-lg`
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {BOOK_STATUS_LABELS[s]}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Rating */}
+          <div className="rounded-2xl bg-slate-800/40 px-4 py-4 ring-1 ring-white/5">
+            <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Ma note</p>
+            {readOnly ? (
+              rating !== null ? (
+                <ReadOnlyStars rating={rating} />
+              ) : (
+                <p className="text-sm italic text-slate-600">Pas encore noté</p>
+              )
             ) : (
-              <div className="flex gap-2">
-                {STATUSES.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => {
-                      setStatus(s)
-                      if (s === 'read' && !finishedAtInput) setFinishedAtInput(toInputDate(new Date()))
-                      if (s === 'reading' && !startedAtInput) setStartedAtInput(toInputDate(new Date()))
-                    }}
-                    className={`flex-1 rounded-lg py-2 text-sm font-medium transition ${
-                      status === s ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                    }`}
-                  >
-                    {BOOK_STATUS_LABELS[s]}
-                  </button>
-                ))}
+              <div>
+                <StarRating value={rating} onChange={setRating} />
+                {rating !== null && (
+                  <p className="mt-2 text-xs text-slate-500">
+                    {rating} / 5 ·{' '}
+                    <button onClick={() => setRating(null)} className="text-rose-400/70 transition hover:text-rose-400">
+                      Effacer
+                    </button>
+                  </p>
+                )}
               </div>
             )}
           </div>
 
-          {/* Note */}
-          <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Note</p>
-            {readOnly ? (
-              rating !== null ? (
-                <div className="flex items-center gap-1.5">
-                  <div className="flex">
-                    {[1, 2, 3, 4, 5].map((star) => {
-                      const full = (rating ?? 0) >= star
-                      const half = !full && (rating ?? 0) >= star - 0.5
-                      return (
-                        <span key={star} className="relative text-xl">
-                          <span className="text-slate-600">★</span>
-                          {(full || half) && (
-                            <span
-                              className="absolute inset-0 text-amber-400"
-                              style={half ? { clipPath: 'inset(0 50% 0 0)' } : undefined}
-                            >★</span>
-                          )}
-                        </span>
-                      )
-                    })}
+          {/* Journal de lecture */}
+          {(status !== 'to_read' || startedAtInput || finishedAtInput) && (
+            <div className="rounded-2xl bg-slate-800/40 px-4 py-4 ring-1 ring-white/5">
+              <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Journal de lecture</p>
+              {readOnly ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-[10px] text-slate-600 mb-1">Commencé le</p>
+                    <p className="text-sm font-medium text-slate-300">
+                      {startedAtInput
+                        ? new Date(startedAtInput).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
+                        : '—'}
+                    </p>
                   </div>
-                  <span className="text-sm text-slate-400">{rating}/5</span>
+                  <div>
+                    <p className="text-[10px] text-slate-600 mb-1">Terminé le</p>
+                    <p className="text-sm font-medium text-slate-300">
+                      {finishedAtInput
+                        ? new Date(finishedAtInput).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
+                        : '—'}
+                    </p>
+                  </div>
                 </div>
               ) : (
-                <p className="text-sm text-slate-500">Pas encore noté</p>
-              )
-            ) : (
-              <StarRating value={rating} onChange={setRating} />
-            )}
-          </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1.5 block text-[10px] text-slate-500">Commencé le</label>
+                    <input
+                      type="date"
+                      value={startedAtInput}
+                      onChange={(e) => setStartedAtInput(e.target.value)}
+                      className="w-full rounded-xl bg-slate-700/60 px-3 py-2 text-sm text-white outline-none ring-1 ring-white/5 transition focus:ring-indigo-500/60"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-[10px] text-slate-500">Terminé le</label>
+                    <input
+                      type="date"
+                      value={finishedAtInput}
+                      onChange={(e) => setFinishedAtInput(e.target.value)}
+                      className="w-full rounded-xl bg-slate-700/60 px-3 py-2 text-sm text-white outline-none ring-1 ring-white/5 transition focus:ring-indigo-500/60"
+                    />
+                  </div>
+                </div>
+              )}
+              {days !== null && (
+                <p className="mt-3 text-xs font-medium text-indigo-400/80">
+                  ⏱ {days} jour{days > 1 ? 's' : ''} de lecture
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Synopsis */}
           {book.description && (
             <div>
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Synopsis</p>
-              <p className={`text-sm text-slate-300 leading-relaxed ${showFullDesc ? '' : 'line-clamp-3'}`}>
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Synopsis</p>
+              <p className={`text-sm leading-relaxed text-slate-400 ${showFullDesc ? '' : 'line-clamp-4'}`}>
                 {book.description}
               </p>
-              {book.description.length > 150 && (
-                <button onClick={() => setShowFullDesc(!showFullDesc)} className="mt-1 text-xs text-indigo-400 hover:text-indigo-300">
-                  {showFullDesc ? 'Voir moins' : 'Voir plus'}
+              {book.description.length > 200 && (
+                <button
+                  onClick={() => setShowFullDesc(!showFullDesc)}
+                  className="mt-1.5 text-xs text-indigo-400 transition hover:text-indigo-300"
+                >
+                  {showFullDesc ? '↑ Voir moins' : '↓ Voir plus'}
                 </button>
               )}
             </div>
           )}
 
-          {/* Notes texte */}
+          {/* Notes personnelles */}
           <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Notes personnelles</p>
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Notes personnelles</p>
             {readOnly ? (
-              <p className="text-sm text-slate-300 leading-relaxed">
-                {notes.trim() || <span className="text-slate-500 italic">Aucune note</span>}
+              <p className="text-sm leading-relaxed text-slate-400">
+                {notes.trim() || <span className="italic text-slate-600">Aucune note</span>}
               </p>
             ) : (
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}
-                placeholder="Tes impressions..."
-                className="w-full resize-none rounded-lg bg-slate-700 px-3 py-2 text-sm text-white placeholder-slate-500 outline-none ring-1 ring-slate-600 focus:ring-indigo-500"
+                placeholder="Tes impressions…"
+                className="w-full resize-none rounded-2xl bg-slate-800/60 px-4 py-3 text-sm text-white placeholder-slate-600 outline-none ring-1 ring-white/5 transition focus:ring-indigo-500/50"
               />
             )}
           </div>
 
           {/* Citations */}
-          <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Citations</p>
-            {quotes.length > 0 && (
-              <div className="mb-3 space-y-2">
-                {quotes.map((q, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    <blockquote className="flex-1 border-l-2 border-indigo-500/60 pl-3 text-sm text-slate-300 italic leading-relaxed">
-                      "{q}"
-                    </blockquote>
-                    {!readOnly && (
-                      <button
-                        onClick={() => setQuotes(quotes.filter((_, idx) => idx !== i))}
-                        className="mt-0.5 shrink-0 text-slate-600 hover:text-red-400 transition"
-                        aria-label="Supprimer"
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-3.5 w-3.5">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-            {!readOnly && (
-              <div className="flex gap-2">
-                <input
-                  value={newQuote}
-                  onChange={(e) => setNewQuote(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && newQuote.trim()) {
-                      setQuotes([...quotes, newQuote.trim()])
-                      setNewQuote('')
-                      e.preventDefault()
-                    }
-                  }}
-                  placeholder="Ajouter une citation…"
-                  className="flex-1 rounded-xl bg-slate-700 px-3 py-2 text-sm text-white placeholder-slate-500 outline-none ring-1 ring-slate-600 focus:ring-indigo-500 transition"
-                />
-                <button
-                  onClick={() => { if (newQuote.trim()) { setQuotes([...quotes, newQuote.trim()]); setNewQuote('') } }}
-                  disabled={!newQuote.trim()}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-700 text-slate-400 transition hover:text-white disabled:opacity-40"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-4 w-4">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                  </svg>
-                </button>
-              </div>
-            )}
-            {readOnly && quotes.length === 0 && (
-              <p className="text-sm text-slate-600 italic">Aucune citation</p>
-            )}
-          </div>
+          {(!readOnly || quotes.length > 0) && (
+            <div>
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Citations</p>
+              {quotes.length > 0 && (
+                <div className="mb-3 space-y-2">
+                  {quotes.map((q, i) => (
+                    <div key={i} className="flex items-start gap-3 rounded-2xl bg-slate-800/40 px-4 py-3 ring-1 ring-white/5">
+                      <svg viewBox="0 0 24 24" fill="currentColor" className="mt-0.5 h-3 w-3 shrink-0 text-indigo-500/60">
+                        <path d="M4.583 17.321C3.553 16.227 3 15 3 13.011c0-3.5 2.457-6.637 6.03-8.188l.893 1.378c-3.335 1.804-3.987 4.145-4.247 5.621.537-.278 1.24-.375 1.929-.311 1.804.167 3.226 1.648 3.226 3.489a3.5 3.5 0 01-3.5 3.5c-1.073 0-2.099-.49-2.748-1.179zm10 0C13.553 16.227 13 15 13 13.011c0-3.5 2.457-6.637 6.03-8.188l.893 1.378c-3.335 1.804-3.987 4.145-4.247 5.621.537-.278 1.24-.375 1.929-.311 1.804.167 3.226 1.648 3.226 3.489a3.5 3.5 0 01-3.5 3.5c-1.073 0-2.099-.49-2.748-1.179z" />
+                      </svg>
+                      <p className="flex-1 text-sm italic leading-relaxed text-slate-300">{q}</p>
+                      {!readOnly && (
+                        <button
+                          onClick={() => setQuotes(quotes.filter((_, idx) => idx !== i))}
+                          className="mt-0.5 shrink-0 text-slate-600 transition hover:text-red-400"
+                          aria-label="Supprimer"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-3.5 w-3.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {!readOnly && (
+                <div className="flex gap-2">
+                  <input
+                    value={newQuote}
+                    onChange={(e) => setNewQuote(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newQuote.trim()) {
+                        setQuotes([...quotes, newQuote.trim()])
+                        setNewQuote('')
+                        e.preventDefault()
+                      }
+                    }}
+                    placeholder="Ajouter une citation…"
+                    className="flex-1 rounded-2xl bg-slate-800/60 px-4 py-2.5 text-sm text-white placeholder-slate-600 outline-none ring-1 ring-white/5 transition focus:ring-indigo-500/50"
+                  />
+                  <button
+                    onClick={() => { if (newQuote.trim()) { setQuotes([...quotes, newQuote.trim()]); setNewQuote('') } }}
+                    disabled={!newQuote.trim()}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-800/60 text-slate-400 ring-1 ring-white/5 transition hover:text-white disabled:opacity-40"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-4 w-4">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+              {readOnly && quotes.length === 0 && (
+                <p className="text-sm italic text-slate-700">Aucune citation enregistrée</p>
+              )}
+            </div>
+          )}
 
+          {/* Actions */}
           {!readOnly && (
-            <>
+            <div className="space-y-2.5 pt-1">
               <button
                 onClick={handleSave}
                 disabled={isSaving}
-                className="w-full rounded-xl bg-indigo-600 py-3 font-medium text-white transition hover:bg-indigo-500 disabled:opacity-50"
+                className="w-full rounded-2xl bg-indigo-600 py-3.5 font-semibold text-white shadow-lg shadow-indigo-900/40 transition hover:bg-indigo-500 active:scale-[0.98] disabled:opacity-50"
               >
-                {isSaving ? 'Enregistrement...' : 'Enregistrer'}
+                {isSaving ? 'Enregistrement…' : 'Enregistrer'}
               </button>
-
               <button
                 onClick={() => setShowRecommend(true)}
-                className="w-full rounded-xl bg-slate-700 py-3 text-sm font-medium text-slate-300 transition hover:bg-slate-600 hover:text-white"
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-800/60 py-3 text-sm font-medium text-slate-300 ring-1 ring-white/5 transition hover:bg-slate-800 hover:text-white"
               >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
+                </svg>
                 Recommander à un ami
               </button>
-
               <button
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className={`w-full rounded-xl py-3 text-sm font-medium transition ${
-                  confirmDelete ? 'bg-red-600 text-white hover:bg-red-500' : 'text-red-400 hover:text-red-300'
+                className={`w-full rounded-2xl py-3 text-sm font-medium transition active:scale-[0.98] ${
+                  confirmDelete
+                    ? 'bg-rose-600/20 text-rose-400 ring-1 ring-rose-500/30 hover:bg-rose-600/30'
+                    : 'text-slate-600 hover:text-slate-400'
                 }`}
               >
-                {isDeleting ? 'Suppression...' : confirmDelete ? 'Confirmer la suppression' : 'Supprimer ce livre'}
+                {isDeleting ? 'Suppression…' : confirmDelete ? '⚠ Confirmer la suppression' : 'Supprimer ce livre'}
               </button>
-            </>
-          )}
-          {showRecommend && (
-            <RecommendBookModal book={book} onClose={() => { setShowRecommend(false); onClose() }} />
+            </div>
           )}
         </div>
       </div>
+
+      {showRecommend && (
+        <RecommendBookModal book={book} onClose={() => { setShowRecommend(false); onClose() }} />
+      )}
     </div>
   )
 }
