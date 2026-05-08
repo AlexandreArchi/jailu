@@ -37,24 +37,23 @@ export default function ScanModal({ onScan, onClose }: ScanModalProps) {
 
     const startCamera = async () => {
       try {
-        // getUserMedia : fonctionne sur iOS Safari (pas d'enumerateDevices requis)
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: 'environment' },
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            advanced: [{ focusMode: 'continuous' }] as any,
-          },
-        })
-        streamRef.current = stream
-        if (stopped || !videoRef.current) return
-        videoRef.current.srcObject = stream
-        await videoRef.current.play()
-
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (typeof BarcodeDetector !== 'undefined') {
-          // ── Android / Chrome : BarcodeDetector natif, temps réel rapide ──
+          // ── Android / Chrome : on gère le stream + BarcodeDetector natif ──
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: { ideal: 'environment' },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              advanced: [{ focusMode: 'continuous' }] as any,
+            },
+          })
+          streamRef.current = stream
+          if (stopped || !videoRef.current) { stream.getTracks().forEach((t) => t.stop()); return }
+          videoRef.current.srcObject = stream
+          await videoRef.current.play()
+
           const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'code_128'] })
           const tick = async () => {
             if (stopped || detectedRef.current || !videoRef.current) return
@@ -68,15 +67,18 @@ export default function ScanModal({ onScan, onClose }: ScanModalProps) {
           }
           animFrame = requestAnimationFrame(tick)
         } else {
-          // ── iOS : ZXing decodeFromStream — scan continu, sans bouton ──
+          // ── iOS : ZXing gère entièrement la caméra via decodeFromConstraints ──
+          // (pas d'enumerateDevices, getUserMedia direct, gestion vidéo interne)
+          if (!videoRef.current) return
           const reader = new BrowserMultiFormatReader()
-          const controls = await reader.decodeFromStream(
-            stream,
+          const controls = await reader.decodeFromConstraints(
+            { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } },
             videoRef.current,
             (result) => {
               if (result && isISBN(result.getText())) found(result.getText())
             },
           )
+          if (stopped) { controls.stop(); return }
           controlsRef.current = controls
         }
       } catch {
