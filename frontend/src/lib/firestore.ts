@@ -146,6 +146,7 @@ export async function updateBook(
     rating?: number | null
     notes?: string | null
     quotes?: string[]
+    pageCount?: number | null
     startedAt?: Date | null
     finishedAt?: Date | null
   },

@@ -24,6 +24,8 @@ async function fetchImg(url: string): Promise<HTMLImageElement | null> {
     const resp = await fetch(url)
     if (!resp.ok) return null
     const blob = await resp.blob()
+    // Reject suspiciously tiny responses (e.g. Open Library 1×1 placeholder = ~43 bytes)
+    if (blob.size < 500) return null
     const blobUrl = URL.createObjectURL(blob)
     return new Promise<HTMLImageElement | null>((resolve) => {
       const img = new Image()
@@ -103,9 +105,10 @@ async function generateShareCard(
   // 2. Stored coverUrl direct (works if server has CORS, e.g. Open Library stored URL)
   // 3. Stored coverUrl via backend proxy (fallback for non-CORS CDNs like Google Books)
   // 4. Stored fallbackUrl via backend proxy
+  // ?default=false makes Open Library return 404 (not a 1×1 grey placeholder) when no cover exists
   const coverCandidates: string[] = [
-    isbn13 ? `https://covers.openlibrary.org/b/isbn/${isbn13}-L.jpg` : '',
-    isbn10 ? `https://covers.openlibrary.org/b/isbn/${isbn10}-L.jpg` : '',
+    isbn13 ? `https://covers.openlibrary.org/b/isbn/${isbn13}-L.jpg?default=false` : '',
+    isbn10 ? `https://covers.openlibrary.org/b/isbn/${isbn10}-L.jpg?default=false` : '',
     coverUrl,
   ].filter(Boolean)
 
@@ -128,34 +131,26 @@ async function generateShareCard(
     loadLocalImg(appIconUrl),
   ])
 
-  // ── Background : blurred cover or dark gradient ──
-  if (coverImg) {
-    ctx.save()
-    ctx.filter = 'blur(52px) brightness(0.25) saturate(1.5)'
-    const scale = Math.max(W / coverImg.width, H / coverImg.height)
-    const bw = coverImg.width * scale, bh = coverImg.height * scale
-    ctx.drawImage(coverImg, (W - bw) / 2, (H - bh) / 2, bw, bh)
-    ctx.restore()
-  } else {
-    const grad = ctx.createLinearGradient(0, 0, 0, H)
-    grad.addColorStop(0, '#0f172a')
-    grad.addColorStop(1, palette.bg + '88')
-    ctx.fillStyle = grad
-    ctx.fillRect(0, 0, W, H)
-  }
+  // ── Background : diagonal indigo → slate → emerald gradient (app palette) ──
+  const bgGrad = ctx.createLinearGradient(0, 0, W, H)
+  bgGrad.addColorStop(0,    '#1e1b4b') // indigo-950
+  bgGrad.addColorStop(0.45, '#0f172a') // slate-900
+  bgGrad.addColorStop(1,    '#022c22') // emerald-950
+  ctx.fillStyle = bgGrad
+  ctx.fillRect(0, 0, W, H)
 
-  // Vignette top + bottom
-  const vigTop = ctx.createLinearGradient(0, 0, 0, H * 0.35)
-  vigTop.addColorStop(0, 'rgba(0,0,0,0.85)')
-  vigTop.addColorStop(1, 'rgba(0,0,0,0)')
-  ctx.fillStyle = vigTop
-  ctx.fillRect(0, 0, W, H * 0.35)
+  // Subtle radial glow top-left (indigo) and bottom-right (emerald)
+  const glowTop = ctx.createRadialGradient(W * 0.2, H * 0.1, 0, W * 0.2, H * 0.1, W * 0.7)
+  glowTop.addColorStop(0, 'rgba(99,102,241,0.25)')  // indigo-500
+  glowTop.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.fillStyle = glowTop
+  ctx.fillRect(0, 0, W, H)
 
-  const vigBot = ctx.createLinearGradient(0, H * 0.6, 0, H)
-  vigBot.addColorStop(0, 'rgba(0,0,0,0)')
-  vigBot.addColorStop(1, 'rgba(0,0,0,0.88)')
-  ctx.fillStyle = vigBot
-  ctx.fillRect(0, H * 0.6, W, H * 0.4)
+  const glowBot = ctx.createRadialGradient(W * 0.8, H * 0.9, 0, W * 0.8, H * 0.9, W * 0.7)
+  glowBot.addColorStop(0, 'rgba(16,185,129,0.20)')  // emerald-500
+  glowBot.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.fillStyle = glowBot
+  ctx.fillRect(0, 0, W, H)
 
   // ── Header : app icon + JAILU wordmark ──
   const ICON_SIZE = 80, ICON_R = 18
@@ -434,6 +429,7 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
   const [status, setStatus] = useState<BookStatus>(book.status)
   const [rating, setRating] = useState<number | null>(book.rating)
   const [notes, setNotes] = useState(book.notes ?? '')
+  const [pageCount, setPageCount] = useState<number | null>(book.pageCount)
   const [finishedAtInput, setFinishedAtInput] = useState(toMonthInput(book.finishedAt))
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -473,7 +469,7 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
     const finishedAt = fromMonthInput(finishedAtInput)
     const extra: { finishedAt?: Date | null } = { finishedAt }
     if (!finishedAt && status === 'read') extra.finishedAt = new Date()
-    await updateBook(book.id, { status, rating, notes: notes.trim() || null, quotes, ...extra })
+    await updateBook(book.id, { status, rating, notes: notes.trim() || null, quotes, pageCount, ...extra })
     setIsSaving(false)
     onUpdated()
     if (becomingRead) {
@@ -781,6 +777,21 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
                   {showFullDesc ? '↑ Voir moins' : '↓ Voir plus'}
                 </button>
               )}
+            </div>
+          )}
+
+          {/* Nombre de pages */}
+          {!readOnly && (
+            <div>
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Nombre de pages</p>
+              <input
+                type="number"
+                min={1}
+                value={pageCount ?? ''}
+                onChange={(e) => setPageCount(e.target.value ? Number(e.target.value) : null)}
+                placeholder="Ex : 320"
+                className="w-full rounded-2xl bg-slate-800/60 px-4 py-3 text-sm text-white placeholder-slate-600 outline-none ring-1 ring-white/5 transition focus:ring-indigo-500/50 [appearance:textfield]"
+              />
             </div>
           )}
 

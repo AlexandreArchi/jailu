@@ -93,7 +93,13 @@ export default function LeaderboardScreen({ myProfile, friends, onClose, onFrien
       players.push(computeStats(uid, username, isMe, books, selectedYear))
     }
     const key: Record<Metric, keyof PlayerStats> = { books: 'booksRead', pages: 'pagesRead', hours: 'readingTimeHours' }
-    return players.sort((a, b) => (b[key[metric]] as number) - (a[key[metric]] as number))
+    return players.sort((a, b) => {
+      const diff = (b[key[metric]] as number) - (a[key[metric]] as number)
+      if (diff !== 0) return diff
+      // Tiebreaker : à égalité de livres → départager par pages lues
+      if (metric === 'books') return b.pagesRead - a.pagesRead
+      return 0
+    })
   }, [allBooks, selectedUids, selectedYear, metric, myProfile, friends])
 
   const maxValue = rankings[0]

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { BrowserMultiFormatReader } from '@zxing/browser'
+import { Html5Qrcode } from 'html5-qrcode'
 
 // Native BarcodeDetector API (Chrome/Android)
 type NativeDetector = {
@@ -13,74 +13,91 @@ interface ScanModalProps {
   onClose: () => void
 }
 
+const isISBN = (s: string) => /^97[89]\d{10}$/.test(s)
+
 export default function ScanModal({ onScan, onClose }: ScanModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const controlsRef = useRef<{ stop: () => void } | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
   const detectedRef = useRef(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState<string | null>(null)
   const [detected, setDetected] = useState(false)
+  const [capturing, setCapturing] = useState(false)
+
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  const hasNativeDetector = typeof BarcodeDetector !== 'undefined'
+
+  const found = (isbn: string) => {
+    if (detectedRef.current) return
+    detectedRef.current = true
+    setDetected(true)
+    onScan(isbn)
+  }
+
+  /** iOS path — ouvre l'appareil photo natif via file input, décode avec html5-qrcode */
+  const handleScanButton = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || detectedRef.current) return
+    setCapturing(true)
+    setError(null)
+    try {
+      const scanner = new Html5Qrcode('__html5qrcode_div__')
+      const result = await scanner.scanFile(file, false)
+      if (isISBN(result)) {
+        found(result)
+      } else {
+        setError('Code non reconnu. Réessayez.')
+      }
+    } catch {
+      setError('Aucun code-barres détecté. Rapprochez-vous et réessayez.')
+    } finally {
+      setCapturing(false)
+      // Reset pour permettre de re-scanner
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
 
   useEffect(() => {
     let animFrame: number
-    let stream: MediaStream | null = null
     let stopped = false
-
-    const found = (isbn: string) => {
-      if (detectedRef.current) return
-      detectedRef.current = true
-      setDetected(true)
-      onScan(isbn)
-    }
 
     const startCamera = async () => {
       try {
-        // Open camera manually for BarcodeDetector path; ZXing opens its own if needed
-        stream = await navigator.mediaDevices.getUserMedia({
+        const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: 'environment' },
             width: { ideal: 1920 },
             height: { ideal: 1080 },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            advanced: [{ focusMode: 'continuous' }] as any,
           },
         })
+        streamRef.current = stream
         if (stopped || !videoRef.current) return
         videoRef.current.srcObject = stream
         await videoRef.current.play()
 
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (typeof BarcodeDetector !== 'undefined') {
-          // Fast native path — hardware-accelerated on Android Chrome
+          // ── Android / Chrome : native hardware detection, real-time ──
           const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'code_128'] })
           const tick = async () => {
             if (stopped || detectedRef.current || !videoRef.current) return
             try {
               const results = await detector.detect(videoRef.current)
               for (const r of results) {
-                if (/^97[89]\d{10}$/.test(r.rawValue)) { found(r.rawValue); return }
+                if (isISBN(r.rawValue)) { found(r.rawValue); return }
               }
-            } catch { /* video not ready yet */ }
+            } catch { /* video not ready */ }
             animFrame = requestAnimationFrame(tick)
           }
           animFrame = requestAnimationFrame(tick)
-        } else {
-          // ZXing fallback — for iOS Safari which lacks BarcodeDetector
-          // Stop our stream first; ZXing will reopen camera itself
-          stream.getTracks().forEach((t) => t.stop())
-          stream = null
-          if (videoRef.current) videoRef.current.srcObject = null
-
-          const reader = new BrowserMultiFormatReader()
-          reader
-            .decodeFromVideoDevice(undefined, videoRef.current!, (result) => {
-              if (!result || detectedRef.current) return
-              const text = result.getText()
-              if (/^97[89]\d{10}$/.test(text)) {
-                found(text)
-                controlsRef.current?.stop()
-              }
-            })
-            .then((controls) => { controlsRef.current = controls })
-            .catch(() => { if (!stopped) setError("Impossible d'accéder à la caméra.") })
         }
+        // ── iOS : pas de détection en continu — l'utilisateur prend une photo via le bouton ──
       } catch {
         if (!stopped) setError("Impossible d'accéder à la caméra. Vérifie les permissions.")
       }
@@ -91,14 +108,26 @@ export default function ScanModal({ onScan, onClose }: ScanModalProps) {
     return () => {
       stopped = true
       cancelAnimationFrame(animFrame)
-      controlsRef.current?.stop()
-      stream?.getTracks().forEach((t) => t.stop())
+      streamRef.current?.getTracks().forEach((t) => t.stop())
       if (videoRef.current) videoRef.current.srcObject = null
     }
   }, [onScan])
 
   return (
     <div className="fixed inset-0 z-50 bg-black">
+      {/* Div requis par html5-qrcode (caché) */}
+      <div id="__html5qrcode_div__" style={{ display: 'none' }} />
+
+      {/* Input file caché — ouvre l'appareil photo natif iOS */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => void handleFileChange(e)}
+      />
+
       <video
         ref={videoRef}
         className="absolute inset-0 h-full w-full object-cover"
@@ -107,23 +136,25 @@ export default function ScanModal({ onScan, onClose }: ScanModalProps) {
         playsInline
       />
 
-      {/* Vignette sur les bords */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{ background: 'radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.55) 100%)' }}
-      />
+      {/* Scan zone : bande horizontale rectangulaire */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute inset-x-0 top-0 bg-black/65" style={{ height: '35%' }} />
+        <div className="absolute inset-x-0 bottom-0 bg-black/65" style={{ height: '35%' }} />
+        <div className="absolute left-0 bg-black/65" style={{ top: '35%', bottom: '35%', width: '6%' }} />
+        <div className="absolute right-0 bg-black/65" style={{ top: '35%', bottom: '35%', width: '6%' }} />
 
-      {/* Coins aux angles */}
-      <div className="absolute inset-4 pointer-events-none">
-        <span className="absolute top-0 left-0 h-8 w-8 border-t-2 border-l-2 border-indigo-400/80 rounded-tl-xl" />
-        <span className="absolute top-0 right-0 h-8 w-8 border-t-2 border-r-2 border-indigo-400/80 rounded-tr-xl" />
-        <span className="absolute bottom-0 left-0 h-8 w-8 border-b-2 border-l-2 border-indigo-400/80 rounded-bl-xl" />
-        <span className="absolute bottom-0 right-0 h-8 w-8 border-b-2 border-r-2 border-indigo-400/80 rounded-br-xl" />
-        {!detected && !error && (
-          <div className="absolute inset-x-0 top-0 h-0.5 bg-indigo-400/70 animate-scan" />
-        )}
+        <div className="absolute" style={{ top: '35%', left: '6%', right: '6%', bottom: '35%' }}>
+          <span className="absolute top-0 left-0 h-7 w-7 border-t-2 border-l-2 border-indigo-400 rounded-tl-lg" />
+          <span className="absolute top-0 right-0 h-7 w-7 border-t-2 border-r-2 border-indigo-400 rounded-tr-lg" />
+          <span className="absolute bottom-0 left-0 h-7 w-7 border-b-2 border-l-2 border-indigo-400 rounded-bl-lg" />
+          <span className="absolute bottom-0 right-0 h-7 w-7 border-b-2 border-r-2 border-indigo-400 rounded-br-lg" />
+          {!detected && !error && !capturing && (
+            <div className="absolute inset-x-0 top-0 h-0.5 bg-indigo-400/80 animate-scan" />
+          )}
+        </div>
       </div>
 
+      {/* Succès */}
       {detected && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/30 ring-2 ring-emerald-400">
@@ -134,15 +165,41 @@ export default function ScanModal({ onScan, onClose }: ScanModalProps) {
         </div>
       )}
 
+      {/* Barre du bas */}
       <div
-        className="absolute bottom-0 inset-x-0 px-6 pb-12 pt-8 text-center"
-        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%)' }}
+        className="absolute bottom-0 inset-x-0 flex flex-col items-center gap-5 px-6 pb-14 pt-6 text-center"
+        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%)' }}
       >
-        {error ? (
-          <p className="text-sm text-red-400">{error}</p>
-        ) : detected ? (
+        {detected ? (
           <p className="text-sm font-semibold text-emerald-400">ISBN détecté — recherche en cours…</p>
+        ) : capturing ? (
+          <div className="flex items-center gap-2">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+            <p className="text-sm text-white/80">Décodage…</p>
+          </div>
+        ) : error ? (
+          <>
+            <p className="text-sm text-red-400">{error}</p>
+            {!hasNativeDetector && (
+              <button
+                onClick={handleScanButton}
+                className="h-16 w-16 rounded-full bg-white ring-4 ring-white/30 transition active:scale-90"
+                aria-label="Réessayer"
+              />
+            )}
+          </>
+        ) : !hasNativeDetector ? (
+          /* ── iOS : bouton shutter → ouvre l'appareil photo natif ── */
+          <>
+            <p className="text-sm text-white/70">Cadrez le code-barres puis appuyez</p>
+            <button
+              onClick={handleScanButton}
+              className="h-16 w-16 rounded-full bg-white ring-4 ring-white/30 transition active:scale-90"
+              aria-label="Scanner"
+            />
+          </>
         ) : (
+          /* ── Android : auto-détection ── */
           <p className="text-sm text-white/80">Pointez la caméra vers le code-barres du livre</p>
         )}
       </div>

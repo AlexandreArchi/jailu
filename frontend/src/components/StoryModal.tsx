@@ -41,7 +41,12 @@ export default function StoryModal({ stories, isMe, onClose, onDeleted }: Props)
         {Array.from({ length: full }).map((_, i) => (
           <span key={`f${i}`} className="text-2xl text-amber-400">★</span>
         ))}
-        {half && <span className="text-2xl text-amber-400">½</span>}
+        {half && (
+          <span className="relative inline-block text-2xl leading-none">
+            <span className="text-white/20">★</span>
+            <span className="absolute inset-0 text-amber-400" style={{ clipPath: 'inset(0 50% 0 0)' }}>★</span>
+          </span>
+        )}
         {Array.from({ length: empty }).map((_, i) => (
           <span key={`e${i}`} className="text-2xl text-white/20">★</span>
         ))}
