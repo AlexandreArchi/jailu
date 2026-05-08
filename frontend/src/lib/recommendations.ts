@@ -80,9 +80,9 @@ export async function getRecommendations(library: UserBook[]): Promise<Suggestio
   const queries: { q: string; reason: string; authorKey?: string }[] = []
   const seenAuthors = new Set<string>()
 
-  // Up to 3 distinct authors from top-rated books
+  // Up to 4 distinct authors from top-rated books
   for (const book of ranked) {
-    if (queries.filter((q) => q.authorKey).length >= 3) break
+    if (queries.filter((q) => q.authorKey).length >= 4) break
     const author = book.authors[0]
     if (!author) continue
     const aKey = author.toLowerCase()
@@ -127,11 +127,12 @@ export async function getRecommendations(library: UserBook[]): Promise<Suggestio
 
   // ── Round-robin merge with diversity caps ────────────────────────────────
   // Rules:
-  //   - max 2 suggestions per query source
-  //   - max 2 suggestions per author in the final list
+  //   - max 1 suggestion per author  → 5 suggestions = 5 auteurs distincts
+  //   - max 3 suggestions per query source (l'auteur cap prime)
+  //   - skip books explicitly in English (évite les doublons FR/EN)
 
-  const MAX_PER_SOURCE = 2
-  const MAX_PER_AUTHOR = 2
+  const MAX_PER_SOURCE = 3
+  const MAX_PER_AUTHOR = 1
 
   const seen = new Set<string>()
   const countPerSource = new Array<number>(queryResults.length).fill(0)
@@ -153,6 +154,8 @@ export async function getRecommendations(library: UserBook[]): Promise<Suggestio
         const book = queryResults[i][queryIndices[i]++]
         if (isDuplicate(book, seen)) continue
         if (isOwned(book, ownedIds, library)) continue
+        // Skip books explicitly in English — évite les doublons version FR/EN
+        if (book.language === 'en') continue
 
         const authorKey = book.authors[0]?.toLowerCase() ?? '__unknown__'
         if ((countPerAuthor[authorKey] ?? 0) >= MAX_PER_AUTHOR) continue
