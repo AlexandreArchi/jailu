@@ -11,13 +11,52 @@ let _cache: { key: string; suggestions: Suggestion[]; at: number } | null = null
 const CACHE_TTL_MS = 60 * 60 * 1000 // 1 h
 
 function buildCacheKey(library: UserBook[]): string {
-  const ids = library.map((b) => b.id).sort().join(',')
-  return ids
+  return library.map((b) => b.id).sort().join(',')
+}
+
+function normalizeTitle(t: string): string {
+  return t
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9 ]/g, '')
+    .trim()
+}
+
+/** True if this search result is already in the user's library (any edition). */
+function isOwned(book: BookResult, ownedIds: Set<string>, library: UserBook[]): boolean {
+  if (ownedIds.has(book.google_books_id)) return true
+  // Same ISBN → same book, different edition
+  if (book.isbn13 && library.some((b) => b.isbn13 === book.isbn13)) return true
+  if (book.isbn10 && library.some((b) => b.isbn10 === book.isbn10)) return true
+  // Same normalised title + first author
+  const normTitle = normalizeTitle(book.title)
+  const firstAuthor = book.authors[0]?.toLowerCase() ?? ''
+  return library.some(
+    (b) =>
+      normalizeTitle(b.title) === normTitle &&
+      (b.authors[0]?.toLowerCase() ?? '') === firstAuthor,
+  )
+}
+
+/** True if we've already picked this book (dedup across query results). */
+function isDuplicate(book: BookResult, seen: Set<string>): boolean {
+  if (seen.has(book.google_books_id)) return true
+  if (book.isbn13 && seen.has(`isbn13:${book.isbn13}`)) return true
+  const key = `${normalizeTitle(book.title)}|${book.authors[0]?.toLowerCase() ?? ''}`
+  return seen.has(key)
+}
+
+function markSeen(book: BookResult, seen: Set<string>) {
+  seen.add(book.google_books_id)
+  if (book.isbn13) seen.add(`isbn13:${book.isbn13}`)
+  const key = `${normalizeTitle(book.title)}|${book.authors[0]?.toLowerCase() ?? ''}`
+  seen.add(key)
 }
 
 /**
- * Builds up to 5 personalised book suggestions from the user's library.
- * Uses only the existing Google Books API — no new backend needed.
+ * Builds up to 5 diverse book suggestions from the user's library.
+ * Enforces: max 2 per query source, max 2 per author in the final list.
  */
 export async function getRecommendations(library: UserBook[]): Promise<Suggestion[]> {
   const readBooks = library.filter((b) => b.status === 'read')
@@ -38,35 +77,35 @@ export async function getRecommendations(library: UserBook[]): Promise<Suggestio
 
   // ── Build candidate queries ──────────────────────────────────────────────
 
-  const queries: { q: string; reason: string }[] = []
-
-  // Top 2 authors (from top-rated books)
+  const queries: { q: string; reason: string; authorKey?: string }[] = []
   const seenAuthors = new Set<string>()
+
+  // Up to 3 distinct authors from top-rated books
   for (const book of ranked) {
+    if (queries.filter((q) => q.authorKey).length >= 3) break
     const author = book.authors[0]
-    if (!author || seenAuthors.has(author)) continue
-    seenAuthors.add(author)
+    if (!author) continue
+    const aKey = author.toLowerCase()
+    if (seenAuthors.has(aKey)) continue
+    seenAuthors.add(aKey)
     queries.push({
       q: `inauthor:"${author}"`,
       reason: `Parce que tu as aimé ${book.title}`,
+      authorKey: aKey,
     })
-    if (queries.length >= 2) break
   }
 
-  // Top 2 categories (weighted by rating)
+  // Top 2 categories (weighted by rating), skip if already covered by author queries
   const catScore: Record<string, { score: number; label: string; book: UserBook }> = {}
   for (const book of ranked) {
     for (const cat of book.tags ?? []) {
-      const key = cat.toLowerCase().trim()
-      if (!key || key.length < 3) continue
-      if (!catScore[key]) catScore[key] = { score: 0, label: cat, book }
-      catScore[key].score += book.rating ?? 3
+      const k = cat.toLowerCase().trim()
+      if (!k || k.length < 3) continue
+      if (!catScore[k]) catScore[k] = { score: 0, label: cat, book }
+      catScore[k].score += book.rating ?? 3
     }
   }
-  const topCats = Object.values(catScore)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 2)
-
+  const topCats = Object.values(catScore).sort((a, b) => b.score - a.score).slice(0, 2)
   for (const { label, book } of topCats) {
     queries.push({
       q: `subject:"${label}"`,
@@ -74,53 +113,68 @@ export async function getRecommendations(library: UserBook[]): Promise<Suggestio
     })
   }
 
-  // Fallback: if no categories found, use more authors
-  if (topCats.length === 0) {
-    let count = 0
-    for (const book of ranked.slice(2)) {
-      const author = book.authors[0]
-      if (!author || seenAuthors.has(author)) continue
-      seenAuthors.add(author)
-      queries.push({
-        q: `inauthor:"${author}"`,
-        reason: `Parce que tu as aimé ${book.title}`,
-      })
-      if (++count >= 2) break
-    }
-  }
-
   if (queries.length === 0) return []
 
   // ── Run queries in parallel ──────────────────────────────────────────────
 
   const ownedIds = new Set(library.map((b) => b.googleBooksId).filter(Boolean))
-
   const settled = await Promise.allSettled(queries.map(({ q }) => searchBooks(q)))
 
+  // Pre-filter each query's results
+  const queryResults: BookResult[][] = settled.map((r) =>
+    r.status === 'fulfilled' ? r.value : [],
+  )
+
+  // ── Round-robin merge with diversity caps ────────────────────────────────
+  // Rules:
+  //   - max 2 suggestions per query source
+  //   - max 2 suggestions per author in the final list
+
+  const MAX_PER_SOURCE = 2
+  const MAX_PER_AUTHOR = 2
+
   const seen = new Set<string>()
+  const countPerSource = new Array<number>(queryResults.length).fill(0)
+  const countPerAuthor: Record<string, number> = {}
+  const queryIndices = new Array<number>(queryResults.length).fill(0)
   const suggestions: Suggestion[] = []
 
-  for (let i = 0; i < settled.length; i++) {
-    const result = settled[i]
-    if (result.status !== 'fulfilled') continue
-    const reason = queries[i].reason
+  // Round-robin: one pick per source per pass
+  let progress = true
+  while (suggestions.length < 5 && progress) {
+    progress = false
+    for (let i = 0; i < queryResults.length; i++) {
+      if (suggestions.length >= 5) break
+      if (countPerSource[i] >= MAX_PER_SOURCE) continue
 
-    for (const book of result.value) {
-      if (seen.has(book.google_books_id)) continue
-      if (ownedIds.has(book.google_books_id)) continue
-      // Skip books whose title/author is already in library (same book, different edition)
-      const titleLower = book.title.toLowerCase()
-      const alreadyOwned = library.some(
-        (b) => b.title.toLowerCase() === titleLower && b.authors[0] === book.authors[0],
-      )
-      if (alreadyOwned) continue
+      // Advance index until we find a valid candidate
+      let found = false
+      while (queryIndices[i] < queryResults[i].length) {
+        const book = queryResults[i][queryIndices[i]++]
+        if (isDuplicate(book, seen)) continue
+        if (isOwned(book, ownedIds, library)) continue
 
-      seen.add(book.google_books_id)
-      suggestions.push({ book, reason })
+        const authorKey = book.authors[0]?.toLowerCase() ?? '__unknown__'
+        if ((countPerAuthor[authorKey] ?? 0) >= MAX_PER_AUTHOR) continue
+
+        // Accept
+        markSeen(book, seen)
+        countPerSource[i]++
+        countPerAuthor[authorKey] = (countPerAuthor[authorKey] ?? 0) + 1
+        suggestions.push({ book, reason: queries[i].reason })
+        found = true
+        progress = true
+        break
+      }
+
+      if (!found) {
+        // Source exhausted — mark as done so we don't loop forever
+        countPerSource[i] = MAX_PER_SOURCE
+      }
     }
   }
 
-  // ── Score: prefer books with cover + description ─────────────────────────
+  // ── Score: prefer books with cover + description + french ────────────────
 
   suggestions.sort((a, b) => {
     let sA = 0
