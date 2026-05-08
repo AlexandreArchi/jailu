@@ -24,9 +24,6 @@ export default function ScanModal({ onScan, onClose }: ScanModalProps) {
   const [error, setError] = useState<string | null>(null)
   const [detected, setDetected] = useState(false)
 
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  const hasNativeDetector = typeof BarcodeDetector !== 'undefined'
-
   const found = (isbn: string) => {
     if (detectedRef.current) return
     detectedRef.current = true
