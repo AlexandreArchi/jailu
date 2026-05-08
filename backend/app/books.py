@@ -231,8 +231,9 @@ async def search_books(query: str, api_key: str) -> list[BookResult]:
         return cached[0]
 
     async with httpx.AsyncClient(timeout=10.0) as client:
-        # ISBN direct
-        isbn = _normalize_isbn(cache_key)
+        # ISBN direct (avec ou sans préfixe "isbn:")
+        raw = cache_key[5:] if cache_key.startswith('isbn:') else cache_key
+        isbn = _normalize_isbn(raw)
         if isbn:
             results = await _fetch(f'isbn:{isbn}', api_key, client, max_results=5)
             if results:

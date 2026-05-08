@@ -42,7 +42,7 @@ export default function SearchTab({ onBookAdded }: SearchTabProps) {
   const handleScan = useCallback(
     (isbn: string) => {
       setShowScan(false)
-      void runSearch(`isbn:${isbn}`)
+      void runSearch(isbn)
     },
     [runSearch],
   )
