@@ -18,7 +18,10 @@ export default function StoryModal({ stories, isMe, onClose, onDeleted }: Props)
   const coverSrc = toHttps(story.bookThumbnailUrl ?? story.bookCoverUrl)
 
   const prev = () => setIndex((i) => Math.max(0, i - 1))
-  const next = () => setIndex((i) => Math.min(stories.length - 1, i + 1))
+  const next = () => {
+    if (index < stories.length - 1) setIndex((i) => i + 1)
+    else onClose()
+  }
 
   const handleDelete = async () => {
     await deleteMyStory(story.id)
@@ -38,24 +41,19 @@ export default function StoryModal({ stories, isMe, onClose, onDeleted }: Props)
   }
 
   return (
-    <div className="fixed inset-0 z-[70] flex flex-col bg-slate-950" onClick={onClose}>
+    <div className="fixed inset-0 z-[70] flex flex-col bg-slate-950">
       {/* Progress indicators */}
-      {stories.length > 1 && (
-        <div className="absolute top-0 inset-x-0 flex gap-1 px-4 pt-3 z-10">
-          {stories.map((_, i) => (
-            <div
-              key={i}
-              className={`flex-1 h-0.5 rounded-full transition-all ${i <= index ? 'bg-white' : 'bg-white/25'}`}
-            />
-          ))}
-        </div>
-      )}
+      <div className="absolute top-0 inset-x-0 flex gap-1 px-4 pt-3 z-20">
+        {stories.map((_, i) => (
+          <div
+            key={i}
+            className={`flex-1 h-0.5 rounded-full transition-all ${i <= index ? 'bg-white' : 'bg-white/25'}`}
+          />
+        ))}
+      </div>
 
-      {/* Header */}
-      <div
-        className="relative flex items-center justify-between px-4 pt-8 pb-4 z-10"
-        onClick={(e) => e.stopPropagation()}
-      >
+      {/* Header — always above tap zones */}
+      <div className="relative z-20 flex items-center justify-between px-4 pt-8 pb-4">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-600/30 ring-2 ring-indigo-500/50">
             <span className="text-sm font-bold text-indigo-300">
@@ -95,13 +93,16 @@ export default function StoryModal({ stories, isMe, onClose, onDeleted }: Props)
         </div>
       </div>
 
-      {/* Content */}
-      <div
-        className="flex flex-1 flex-col items-center justify-center gap-6 px-8"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Book cover */}
-        <div className="h-72 w-48 overflow-hidden rounded-2xl shadow-2xl shadow-black/60 ring-1 ring-white/10">
+      {/* Content area — tap left = prev, tap right = next/close */}
+      <div className="relative flex flex-1 flex-col items-center justify-center gap-6 px-8 pb-12">
+        {/* Invisible tap zones (z-10, behind nothing above header) */}
+        <div className="absolute inset-0 z-10 flex">
+          <div className="flex-1" onClick={() => { if (index > 0) prev() }} />
+          <div className="flex-1" onClick={next} />
+        </div>
+
+        {/* Visuals — pointer-events-none so taps pass to zones */}
+        <div className="pointer-events-none h-72 w-48 overflow-hidden rounded-2xl shadow-2xl shadow-black/60 ring-1 ring-white/10">
           {coverSrc ? (
             <img src={coverSrc} alt={story.bookTitle} className="h-full w-full object-cover" />
           ) : (
@@ -110,9 +111,7 @@ export default function StoryModal({ stories, isMe, onClose, onDeleted }: Props)
             </div>
           )}
         </div>
-
-        {/* Book info */}
-        <div className="w-full max-w-xs text-center">
+        <div className="pointer-events-none w-full max-w-xs text-center">
           {!isMe && (
             <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-indigo-400">
               a terminé ce livre
@@ -129,32 +128,9 @@ export default function StoryModal({ stories, isMe, onClose, onDeleted }: Props)
         </div>
       </div>
 
-      {/* Navigation prev/next */}
+      {/* Story counter (bottom centre) */}
       {stories.length > 1 && (
-        <div
-          className="flex justify-between px-4 pb-12"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            onClick={prev}
-            disabled={index === 0}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-800/80 text-slate-300 transition disabled:opacity-30 hover:bg-slate-700"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <span className="self-center text-xs text-slate-500">{index + 1} / {stories.length}</span>
-          <button
-            onClick={next}
-            disabled={index === stories.length - 1}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-800/80 text-slate-300 transition disabled:opacity-30 hover:bg-slate-700"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-5 w-5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
+        <p className="pb-8 text-center text-xs text-slate-600">{index + 1} / {stories.length}</p>
       )}
     </div>
   )

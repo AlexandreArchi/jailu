@@ -84,6 +84,8 @@ export default function HomeTab({ books, isLoading, displayName, onBookClick, on
   const toRead = books.filter((b) => b.status === 'to_read')
   const reading = books.filter((b) => b.status === 'reading')
   const read = books.filter((b) => b.status === 'read')
+  const currentYear = new Date().getFullYear()
+  const readThisYear = read.filter((b) => (b.finishedAt ?? b.createdAt).getFullYear() === currentYear)
   const lastRead = [...read]
     .sort((a, b) => (b.finishedAt ?? b.createdAt).getTime() - (a.finishedAt ?? a.createdAt).getTime())
     .slice(0, 4)
@@ -143,7 +145,7 @@ export default function HomeTab({ books, isLoading, displayName, onBookClick, on
 
       <div className="space-y-7 px-4 pt-5 sm:px-6">
         {/* Reading goal banner */}
-        <GoalBanner readCount={read.length} goal={goal} onGoalChange={onGoalChange} />
+        <GoalBanner readCount={readThisYear.length} goal={goal} onGoalChange={onGoalChange} />
 
         {/* Summary cards */}
         <div className="grid grid-cols-2 gap-3">

@@ -11,11 +11,12 @@ import {
   subscribeToFriends,
   subscribeToRecommendations,
   deleteRecommendation,
+  addBook,
   getFriendsStories,
   getMyStories,
   type FriendshipStatus,
 } from '../lib/firestore'
-import type { FriendEntry, FriendRequest, Recommendation, Story, UserProfile } from '../types/book'
+import type { BookResult, FriendEntry, FriendRequest, Recommendation, Story, UserProfile } from '../types/book'
 import FriendLibraryScreen from './FriendLibraryScreen'
 import LeaderboardScreen from './LeaderboardScreen'
 import StoryModal from './StoryModal'
@@ -73,6 +74,8 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
   const [isLoading, setIsLoading] = useState(true)
   const [viewingFriend, setViewingFriend] = useState<FriendEntry | null>(null)
   const [showLeaderboard, setShowLeaderboard] = useState(false)
+  const [selectedRec, setSelectedRec] = useState<Recommendation | null>(null)
+  const [addingRec, setAddingRec] = useState(false)
 
   useEffect(() => {
     const unsubReqs = subscribeToPendingRequests((reqs) => {
@@ -149,6 +152,34 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
   }
   if (myStories.length > 0) storiesByUid.set(myUid, myStories)
 
+  const toHttps = (url: string) => url.replace('http://', 'https://')
+
+  const handleAddFromRec = async (rec: Recommendation) => {
+    setAddingRec(true)
+    try {
+      const bookResult: BookResult = {
+        google_books_id: rec.googleBooksId ?? '',
+        isbn13: null,
+        isbn10: null,
+        title: rec.bookTitle,
+        subtitle: null,
+        authors: rec.bookAuthors,
+        publisher: null,
+        published_date: null,
+        page_count: null,
+        description: null,
+        cover_url: rec.bookCoverUrl,
+        thumbnail_url: rec.bookThumbnailUrl,
+        categories: [],
+      }
+      await addBook(bookResult, 'to_read')
+      await deleteRecommendation(rec.id)
+      setSelectedRec(null)
+    } finally {
+      setAddingRec(false)
+    }
+  }
+
   const handleRemoveFriend = async (friendUid: string) => {
     await removeFriend(friendUid)
     if (viewingFriend?.uid === friendUid) setViewingFriend(null)
@@ -184,6 +215,45 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
           }}
         />
       )}
+      {/* Recommendation detail modal */}
+      {selectedRec && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60" onClick={() => setSelectedRec(null)}>
+          <div className="w-full max-w-sm rounded-t-2xl bg-slate-800 p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start gap-4 mb-5">
+              <div className="h-20 w-14 shrink-0 overflow-hidden rounded-xl bg-slate-700 shadow-lg">
+                <img
+                  src={toHttps(selectedRec.bookThumbnailUrl ?? selectedRec.bookCoverUrl)}
+                  alt={selectedRec.bookTitle}
+                  className="h-full w-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-indigo-400 font-medium mb-1">Recommandé par @{selectedRec.fromUsername}</p>
+                <p className="text-base font-bold text-white leading-tight">{selectedRec.bookTitle}</p>
+                <p className="text-xs text-slate-400 mt-0.5">{selectedRec.bookAuthors.join(', ')}</p>
+                {selectedRec.message && (
+                  <p className="mt-2 text-xs text-slate-400 italic">"{selectedRec.message}"</p>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => void handleAddFromRec(selectedRec)}
+              disabled={addingRec}
+              className="mb-2 w-full rounded-xl bg-indigo-600 py-3 font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-50"
+            >
+              {addingRec ? 'Ajout...' : '+ Ajouter à ma liste'}
+            </button>
+            <button
+              onClick={() => { void deleteRecommendation(selectedRec.id); setSelectedRec(null) }}
+              className="w-full rounded-xl py-2.5 text-sm text-slate-400 transition hover:text-slate-200"
+            >
+              Ignorer
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header + search */}
       <div className="px-4 pt-4 pb-3 sm:px-6 space-y-3">
         <div className="flex items-center justify-between">
@@ -333,30 +403,37 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
                   <span className="ml-2 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">{recommendations.length}</span>
                 </h2>
                 <div className="space-y-2">
-                  {recommendations.map((rec) => {
-                    const toHttps = (url: string) => url.replace('http://', 'https://')
-                    return (
-                      <SwipeToDelete key={rec.id} onDelete={() => void deleteRecommendation(rec.id)}>
-                      <div className="flex items-start gap-3 rounded-2xl bg-slate-800/60 px-4 py-3 ring-1 ring-white/5">
-                        <div className="h-14 w-10 shrink-0 overflow-hidden rounded-lg bg-slate-700">
-                          <img
-                            src={toHttps(rec.bookThumbnailUrl ?? rec.bookCoverUrl)}
-                            alt={rec.bookTitle}
-                            className="h-full w-full object-cover"
-                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                          />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs text-indigo-400 font-medium">@{rec.fromUsername} recommande</p>
-                          <p className="text-sm font-semibold text-white truncate">{rec.bookTitle}</p>
-                          <p className="text-xs text-slate-500 truncate">{rec.bookAuthors.join(', ')}</p>
-                          {rec.message && (
-                            <p className="mt-1 text-xs text-slate-400 italic">"{rec.message}"</p>
-                          )}
-                        </div>
+                  {recommendations.map((rec) => (
+                    <SwipeToDelete key={rec.id} onDelete={() => void deleteRecommendation(rec.id)}>
+                      <div className="flex items-start gap-3 rounded-2xl bg-slate-800/60 ring-1 ring-white/5 overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRec(rec)}
+                          className="flex flex-1 items-start gap-3 px-4 py-3 text-left transition active:bg-slate-700/40"
+                        >
+                          <div className="h-14 w-10 shrink-0 overflow-hidden rounded-lg bg-slate-700">
+                            <img
+                              src={toHttps(rec.bookThumbnailUrl ?? rec.bookCoverUrl)}
+                              alt={rec.bookTitle}
+                              className="h-full w-full object-cover"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                            />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs text-indigo-400 font-medium">@{rec.fromUsername} recommande</p>
+                            <p className="text-sm font-semibold text-white truncate">{rec.bookTitle}</p>
+                            <p className="text-xs text-slate-500 truncate">{rec.bookAuthors.join(', ')}</p>
+                            {rec.message && (
+                              <p className="mt-1 text-xs text-slate-400 italic">"{rec.message}"</p>
+                            )}
+                          </div>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="mt-1 h-4 w-4 shrink-0 text-slate-600">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                          </svg>
+                        </button>
                         <button
                           onClick={() => void deleteRecommendation(rec.id)}
-                          className="shrink-0 flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 hover:text-slate-400 transition"
+                          className="shrink-0 flex h-full items-center px-3 text-slate-600 hover:text-slate-400 transition"
                           aria-label="Ignorer"
                         >
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
@@ -364,9 +441,8 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
                           </svg>
                         </button>
                       </div>
-                      </SwipeToDelete>
-                    )
-                  })}
+                    </SwipeToDelete>
+                  ))}
                 </div>
               </section>
             )}
