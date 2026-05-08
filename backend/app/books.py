@@ -77,27 +77,84 @@ def _parse_volume(item: dict) -> BookResult | None:
     )
 
 
+# Éditeurs français de référence → boost fort
+_FR_PUBLISHERS: frozenset[str] = frozenset({
+    'folio', 'gallimard', 'pocket', 'livre de poche', 'lgf', "j'ai lu", 'points',
+    'babel', 'actes sud', 'albin michel', 'flammarion', 'seuil', 'grasset',
+    'fayard', 'robert laffont', 'calmann-lévy', 'calmann levy', 'denoël', 'denoel',
+    'stock', 'rivages', 'picquier', 'phébus', 'phebus', 'minuit', 'plon',
+    'julliard', 'belfond', 'lattès', 'lattes', 'michel lafon', 'anne carrière',
+    'xo editions', 'xo éditions', 'fleuve', 'bragelonne', 'milady',
+    "l'archipel", 'archipel', 'cherche midi', 'leduc', 'marabout',
+    'hachette', 'hachette romans', 'le masque',
+    'j\'ai lu', 'j ai lu',
+    '10/18', '10 18',
+})
+
+# Fiches de lecture, résumés, livres scolaires → pénalité forte
+_STUDY_GUIDE_RE = re.compile(
+    r'\b('
+    r'r[eé]sum[eé]|fiche\s+de\s+lecture|analyse\s+d[eu]|commentaire\s+d[eu]|'
+    r'[eé]tude\s+d[eu]|questionnaire|workbook|bac\s+\d|dissertation|'
+    r'synth[eè]se|annot[eé]|abr[eé]g[eé]|version\s+abr[eé]g[eé]e|'
+    r'corrig[eé]|guide\s+de\s+lecture|en\s+\d+\s+minutes?|'
+    r'minutes?\s+pour|pr[eé]pa\s+bac|cours\s+magistral|lekt[uü]re'
+    r')\b',
+    re.IGNORECASE,
+)
+
+
 def _score(book: BookResult) -> int:
     s = 0
+
+    # ── Langue ───────────────────────────────────────────────────────────────
     if book.language == 'fr':
-        s += 12
+        s += 15
+    elif book.language and book.language != 'fr':
+        s -= 5  # pénalité légère pour toute langue non-française explicite
+
+    # ── ISBN (signal de qualité éditoriale) ───────────────────────────────────
     if book.isbn13:
         s += 10
     elif book.isbn10:
         s += 5
-    # Open Library cover = better quality than Google Books thumbnail
+
+    # ── Couverture ────────────────────────────────────────────────────────────
     if book.cover_url and 'openlibrary' in book.cover_url:
         s += 8
     elif book.cover_url:
         s += 3
+
+    # ── Description ───────────────────────────────────────────────────────────
     if book.description:
         s += 5
-    if book.page_count and book.page_count > 0:
-        s += 3
+
+    # ── Nombre de pages (signal : vrai roman vs résumé) ─────────────────────
+    if book.page_count:
+        if 100 <= book.page_count <= 1200:
+            s += 4          # livre classique
+        elif book.page_count < 80:
+            s -= 15         # trop court → probablement un résumé
+        elif book.page_count > 1500:
+            s -= 5          # encyclopédie / anthology
+
+    # ── Éditeur ───────────────────────────────────────────────────────────────
     if book.publisher:
-        s += 2
+        pub = book.publisher.lower()
+        if any(fp in pub for fp in _FR_PUBLISHERS):
+            s += 15         # édition française de référence
+        else:
+            s += 1          # éditeur inconnu mais présent
+
+    # ── Date de publication ───────────────────────────────────────────────────
     if book.published_date:
         s += 1
+
+    # ── Pénalité fiche de lecture / annoté / résumé ──────────────────────────
+    full_title = f"{book.title} {book.subtitle or ''}"
+    if _STUDY_GUIDE_RE.search(full_title):
+        s -= 60             # pratiquement éliminé du classement
+
     return s
 
 
@@ -241,7 +298,7 @@ async def _fetch_open_library(isbn: str, client: httpx.AsyncClient) -> list[Book
         return []
 
 
-async def _fetch(q: str, api_key: str, client: httpx.AsyncClient, max_results: int = 20) -> list[BookResult]:
+async def _fetch(q: str, api_key: str, client: httpx.AsyncClient, max_results: int = 20, lang_restrict: str | None = None) -> list[BookResult]:
     params = {
         'q': q,
         'maxResults': max_results,
@@ -249,6 +306,8 @@ async def _fetch(q: str, api_key: str, client: httpx.AsyncClient, max_results: i
         'orderBy': 'relevance',
         'key': api_key,
     }
+    if lang_restrict:
+        params['langRestrict'] = lang_restrict
     try:
         response = await client.get(GOOGLE_BOOKS_URL, params=params)
         response.raise_for_status()
@@ -302,8 +361,14 @@ async def search_books(query: str, api_key: str) -> list[BookResult]:
 
         queries = queries[:6]
 
-        logger.info('Requêtes pour "%s": %s', cache_key, queries)
-        results_lists = await asyncio.gather(*[_fetch(q, api_key, client) for q in queries])
+        # Ajouter une variante langRestrict=fr sur la requête brute
+        # pour s'assurer que les éditions françaises sont dans le pool
+        fr_query = queries[0]  # requête brute (la plus précise)
+        logger.info('Requêtes pour "%s": %s + variante fr', cache_key, queries)
+        results_lists = await asyncio.gather(
+            *[_fetch(q, api_key, client) for q in queries],
+            _fetch(fr_query, api_key, client, lang_restrict='fr'),
+        )
 
         seen: set[str] = set()
         merged: list[BookResult] = []
