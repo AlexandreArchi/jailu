@@ -15,14 +15,15 @@ function SuggestionCard({ suggestion, onClick }: { suggestion: Suggestion; onCli
   const { book, reason } = suggestion
   const [src, setSrc] = useState(book.cover_url || book.thumbnail_url || '')
   const fallback = book.thumbnail_url ?? ''
+  const palette = coverPalette(book.title)
 
   return (
     <button
       onClick={onClick}
-      className="shrink-0 group flex flex-col gap-2 w-[104px] active:scale-95 transition-transform duration-150 text-left"
+      className="group w-full flex items-stretch gap-3 rounded-2xl bg-slate-800/60 p-3 active:scale-[0.98] transition-transform duration-150 text-left"
     >
-      {/* Cover */}
-      <div className="relative h-44 w-full overflow-hidden rounded-2xl bg-slate-800 shadow-xl">
+      {/* Cover — left */}
+      <div className="shrink-0 w-16 h-24 rounded-xl overflow-hidden shadow-lg">
         {src ? (
           <img
             src={src}
@@ -32,39 +33,47 @@ function SuggestionCard({ suggestion, onClick }: { suggestion: Suggestion; onCli
           />
         ) : (
           <div
-            className="flex h-full w-full flex-col items-center justify-center gap-1 p-2"
-            style={{ background: coverPalette(book.title).bg }}
+            className="flex h-full w-full items-center justify-center"
+            style={{ background: palette.bg }}
           >
-            <span className="text-4xl font-bold opacity-70" style={{ color: coverPalette(book.title).fg }}>
+            <span className="text-2xl font-bold opacity-70" style={{ color: palette.fg }}>
               {book.title[0]?.toUpperCase()}
             </span>
           </div>
         )}
-        {/* Gradient + title */}
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent px-2 pb-2 pt-8">
-          <p className="text-[10px] font-semibold text-white leading-tight line-clamp-2">{book.title}</p>
-        </div>
-        {/* Add badge */}
-        <div className="absolute top-2 right-2 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600/90 opacity-0 group-active:opacity-100 transition-opacity">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-3.5 w-3.5 text-white">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-        </div>
       </div>
-      {/* Reason */}
-      {reason ? (
-        <p className="text-xs leading-snug text-slate-400 line-clamp-2">{reason}</p>
-      ) : null}
+
+      {/* Text — right */}
+      <div className="flex flex-col justify-center gap-1 min-w-0 flex-1">
+        <p className="text-sm font-semibold text-white leading-tight line-clamp-2">{book.title}</p>
+        {book.authors?.[0] && (
+          <p className="text-xs text-slate-400 truncate">{book.authors[0]}</p>
+        )}
+        {reason && (
+          <p className="text-xs leading-snug text-slate-300 line-clamp-3 mt-0.5">{reason}</p>
+        )}
+      </div>
+
+      {/* Add chevron */}
+      <div className="shrink-0 self-center text-slate-500 group-active:text-indigo-400 transition-colors">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+        </svg>
+      </div>
     </button>
   )
 }
 
 function SkeletonCard() {
   return (
-    <div className="shrink-0 w-[104px] space-y-2">
-      <div className="skeleton h-44 w-full rounded-2xl" />
-      <div className="skeleton h-3 w-3/4 rounded" />
-      <div className="skeleton h-3 w-1/2 rounded" />
+    <div className="w-full flex items-center gap-3 rounded-2xl bg-slate-800/60 p-3">
+      <div className="skeleton shrink-0 w-16 h-24 rounded-xl" />
+      <div className="flex flex-col gap-2 flex-1">
+        <div className="skeleton h-3.5 w-3/4 rounded" />
+        <div className="skeleton h-3 w-1/2 rounded" />
+        <div className="skeleton h-3 w-full rounded mt-1" />
+        <div className="skeleton h-3 w-4/5 rounded" />
+      </div>
     </div>
   )
 }
@@ -110,10 +119,10 @@ export default function SuggestionsSection({ books, onBookAdded }: Props) {
     <section>
       <div className="mb-3 flex items-center gap-2">
         <span className="text-base">✨</span>
-        <h2 className="text-base font-bold text-white">Suggestions pour toi</h2>
+        <h2 className="text-base font-bold text-white">Suggestions du jour selon tes goûts</h2>
       </div>
 
-      <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
+      <div className="flex flex-col gap-2">
         {status === 'loading'
           ? [1, 2, 3].map((i) => <SkeletonCard key={i} />)
           : suggestions.map((s) => (
