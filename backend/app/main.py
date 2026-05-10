@@ -138,7 +138,7 @@ async def get_suggestions(body: SuggestionsRequest) -> list[SuggestionItem]:
             )
         )
 
-    return suggestions[:5]
+    return suggestions[:3]
 
 
 # ── Image proxy ──────────────────────────────────────────────────────────────────

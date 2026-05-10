@@ -201,12 +201,7 @@ export default function HomeTab({ books, isLoading, displayName, onBookClick, on
           </button>
         </div>
 
-        {/* Suggestions */}
-        {!isLoading && read.length >= 1 && (
-          <SuggestionsSection books={books} onBookAdded={onBookAdded} />
-        )}
-
-        {/* En cours */}
+        {/* En cours — au-dessus des suggestions pour un accès immédiat */}
         {reading.length > 0 && (
           <section>
             <SectionHeader label="En cours" count={reading.length} />
@@ -228,6 +223,11 @@ export default function HomeTab({ books, isLoading, displayName, onBookClick, on
               ))}
             </div>
           </section>
+        )}
+
+        {/* Suggestions — après les livres de l'utilisateur (chargement asynchrone) */}
+        {read.length >= 1 && (
+          <SuggestionsSection books={books} onBookAdded={onBookAdded} />
         )}
 
         {/* Derniers lus */}

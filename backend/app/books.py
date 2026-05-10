@@ -177,13 +177,16 @@ def _keywords_only(q: str) -> str:
 def _spell_correct(q: str) -> str | None:
     """
     Corrige les fautes de lettres mot par mot.
-    Ignore les mots courts (≤4 chars) et les mots déjà connus du dictionnaire fr.
+    Ignore les mots courts (< 7 chars), les noms propres (majuscule initiale),
+    et les mots contenant des préfixes Google Books (intitle:, inauthor:).
     Retourne None si aucune correction n'est appliquée.
     """
     words = q.split()
-    # Seuil à 7 chars : évite les faux positifs sur les mots courts
-    # ("egares" → "gares" est un faux positif sans ce seuil)
-    candidates = [w.lower() for w in words if len(w) >= 7]
+    # Seuil à 7 chars + ignorer les noms propres (maj) + les préfixes structurés
+    candidates = [
+        w.lower() for w in words
+        if len(w) >= 7 and not w[0].isupper() and ':' not in w
+    ]
     unknown = _spell_fr.unknown(candidates)
     if not unknown:
         return None
@@ -216,7 +219,13 @@ def _build_queries(q: str) -> list[str]:
     """
     Construit plusieurs variantes de requête pour maximiser les chances de trouver un livre.
     Les guillemets sont essentiels pour les préfixes intitle:/inauthor: sur plusieurs mots.
+    Si la requête contient déjà des préfixes structurés (intitle:/inauthor:),
+    on la retourne telle quelle sans générer de variantes incohérentes.
     """
+    # Requête déjà structurée (ex : suggestions Groq) → utiliser directement
+    if 'intitle:' in q or 'inauthor:' in q:
+        return [q]
+
     words = q.split()
     queries: list[str] = [q]  # requête brute en premier
 

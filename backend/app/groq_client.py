@@ -27,9 +27,9 @@ async def get_book_recommendations(
     prompt = (
         "Tu es un libraire expert francophone. Voici les livres les mieux notés d'un lecteur :\n\n"
         f"{books_str}\n\n"
-        "Recommande exactement 5 livres que ce lecteur aimerait vraiment lire. Règles :\n"
+        "Recommande exactement 3 livres que ce lecteur aimerait vraiment lire. Règles :\n"
         "- Livres réels, disponibles en version française\n"
-        "- 5 auteurs différents entre eux ET différents des auteurs listés ci-dessus\n"
+        "- 3 auteurs différents entre eux ET différents des auteurs listés ci-dessus\n"
         "- Pas de suite directe d'un livre déjà listé\n"
         "- Variété de styles et d'univers\n\n"
         "Réponds UNIQUEMENT avec un tableau JSON valide, sans markdown, sans explication :\n"

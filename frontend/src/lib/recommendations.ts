@@ -9,9 +9,37 @@ export interface Suggestion {
   sourceAuthor: string
 }
 
-// Module-level cache to survive tab switches
-let _cache: { key: string; suggestions: Suggestion[]; at: number } | null = null
-const CACHE_TTL_MS = 60 * 60 * 1000 // 1 h
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 h
+const STORAGE_KEY = 'jailu_suggestions_cache'
+
+type CacheEntry = { key: string; suggestions: Suggestion[]; at: number }
+
+// Module-level cache (survit aux changements de tab)
+let _mem: CacheEntry | null = null
+
+function _loadFromStorage(): CacheEntry | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    return JSON.parse(raw) as CacheEntry
+  } catch { return null }
+}
+
+function _saveToStorage(entry: CacheEntry) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(entry)) } catch {}
+}
+
+function _getCache(): CacheEntry | null {
+  if (_mem) return _mem
+  const stored = _loadFromStorage()
+  if (stored) { _mem = stored }
+  return _mem
+}
+
+function _setCache(entry: CacheEntry) {
+  _mem = entry
+  _saveToStorage(entry)
+}
 
 function buildCacheKey(library: UserBook[]): string {
   const uid = auth.currentUser?.uid ?? ''
@@ -19,16 +47,17 @@ function buildCacheKey(library: UserBook[]): string {
 }
 
 /**
- * Fetches up to 5 personalised book suggestions via Groq + Google Books.
- * Results are cached for 1 hour in module scope.
+ * Fetches up to 3 personalised book suggestions via Groq + Google Books.
+ * Results are cached 24 h in localStorage + module scope.
  */
 export async function getRecommendations(library: UserBook[]): Promise<Suggestion[]> {
   const readBooks = library.filter((b) => b.status === 'read')
   if (readBooks.length === 0) return []
 
   const key = buildCacheKey(library)
-  if (_cache && _cache.key === key && Date.now() - _cache.at < CACHE_TTL_MS) {
-    return _cache.suggestions
+  const cached = _getCache()
+  if (cached && cached.key === key && Date.now() - cached.at < CACHE_TTL_MS) {
+    return cached.suggestions
   }
 
   // Sort by rating desc, then recency desc
@@ -55,7 +84,7 @@ export async function getRecommendations(library: UserBook[]): Promise<Suggestio
       sourceTitle: r.source_title,
       sourceAuthor: r.source_author,
     }))
-    _cache = { key, suggestions, at: Date.now() }
+    _setCache({ key, suggestions, at: Date.now() })
     return suggestions
   } catch {
     return []
@@ -63,5 +92,6 @@ export async function getRecommendations(library: UserBook[]): Promise<Suggestio
 }
 
 export function invalidateRecommendationsCache() {
-  _cache = null
+  _mem = null
+  try { localStorage.removeItem(STORAGE_KEY) } catch {}
 }
