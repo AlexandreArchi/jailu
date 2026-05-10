@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from .books import BookResult, search_books
 from .config import settings
+from .groq_client import generate_suggestion_reason
 from .logging_config import configure_logging
 
 configure_logging(settings.environment)
@@ -54,6 +55,33 @@ class HealthResponse(BaseModel):
 @app.get('/api/health', response_model=HealthResponse)
 async def health() -> HealthResponse:
     return HealthResponse(status='ok', version=settings.version)
+
+
+class SuggestionReasonRequest(BaseModel):
+    source_title: str
+    source_author: str
+    suggested_title: str
+    suggested_author: str
+    suggested_description: str | None = None
+
+
+class SuggestionReasonResponse(BaseModel):
+    reason: str | None
+
+
+@app.post('/api/suggestions/reason', response_model=SuggestionReasonResponse)
+async def suggestion_reason(body: SuggestionReasonRequest) -> SuggestionReasonResponse:
+    if not settings.groq_api_key:
+        raise HTTPException(status_code=503, detail='Groq non configuré')
+    reason = await generate_suggestion_reason(
+        body.source_title,
+        body.source_author,
+        body.suggested_title,
+        body.suggested_author,
+        body.suggested_description,
+        settings.groq_api_key,
+    )
+    return SuggestionReasonResponse(reason=reason)
 
 
 @app.get('/api/books/search', response_model=list[BookResult])

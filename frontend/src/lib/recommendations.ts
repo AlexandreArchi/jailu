@@ -4,6 +4,8 @@ import type { BookResult, UserBook } from '../types/book'
 export interface Suggestion {
   book: BookResult
   reason: string
+  sourceTitle: string
+  sourceAuthor: string
 }
 
 // Module-level cache to survive tab switches
@@ -78,7 +80,7 @@ export async function getRecommendations(library: UserBook[]): Promise<Suggestio
 
   // ── Build candidate queries ──────────────────────────────────────────────
 
-  const queries: { q: string; reason: string; authorKey?: string }[] = []
+  const queries: { q: string; reason: string; authorKey?: string; sourceTitle: string; sourceAuthor: string }[] = []
   const seenAuthors = new Set<string>()
 
   // Up to 4 distinct authors from top-rated books
@@ -93,6 +95,8 @@ export async function getRecommendations(library: UserBook[]): Promise<Suggestio
       q: `inauthor:"${author}"`,
       reason: `Parce que tu as aimé ${book.title}`,
       authorKey: aKey,
+      sourceTitle: book.title,
+      sourceAuthor: author,
     })
   }
 
@@ -111,6 +115,8 @@ export async function getRecommendations(library: UserBook[]): Promise<Suggestio
     queries.push({
       q: `subject:"${label}"`,
       reason: `Parce que tu aimes ${book.title}`,
+      sourceTitle: book.title,
+      sourceAuthor: book.authors[0] ?? '',
     })
   }
 
@@ -165,7 +171,7 @@ export async function getRecommendations(library: UserBook[]): Promise<Suggestio
         markSeen(book, seen)
         countPerSource[i]++
         countPerAuthor[authorKey] = (countPerAuthor[authorKey] ?? 0) + 1
-        suggestions.push({ book, reason: queries[i].reason })
+        suggestions.push({ book, reason: queries[i].reason, sourceTitle: queries[i].sourceTitle, sourceAuthor: queries[i].sourceAuthor })
         found = true
         progress = true
         break

@@ -2,9 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { getRecommendations, invalidateRecommendationsCache, type Suggestion } from '../lib/recommendations'
 import { addBook } from '../lib/firestore'
+import { getSuggestionReason } from '../lib/api'
 import type { UserBook, BookStatus, BookResult } from '../types/book'
 import AddBookModal from './AddBookModal'
 import { coverPalette } from '../lib/coverColor'
+
+// Module-level cache: googleBooksId → enriched reason (survives re-renders)
+const _groqReasonCache = new Map<string, string>()
 
 interface Props {
   books: UserBook[]
@@ -72,6 +76,7 @@ export default function SuggestionsSection({ books, onBookAdded }: Props) {
   const [selected, setSelected] = useState<BookResult | null>(null)
   const [isAdding, setIsAdding] = useState(false)
   const fetchedFor = useRef<string>('')
+  const enrichedIds = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     const key = books.map((b) => b.id).sort().join(',')
@@ -81,11 +86,49 @@ export default function SuggestionsSection({ books, onBookAdded }: Props) {
     setStatus('loading')
     getRecommendations(books)
       .then((s) => {
-        setSuggestions(s)
+        // Apply cached Groq reasons immediately if available
+        const withCached = s.map((sug) => ({
+          ...sug,
+          reason: _groqReasonCache.get(sug.book.google_books_id) ?? sug.reason,
+        }))
+        setSuggestions(withCached)
         setStatus(s.length > 0 ? 'ready' : 'empty')
       })
       .catch(() => setStatus('empty'))
   }, [books])
+
+  // Enrich reasons with Groq in the background
+  useEffect(() => {
+    if (status !== 'ready' || suggestions.length === 0) return
+
+    const toEnrich = suggestions.filter(
+      (s) => !enrichedIds.current.has(s.book.google_books_id) && !_groqReasonCache.has(s.book.google_books_id),
+    )
+    if (toEnrich.length === 0) return
+
+    toEnrich.forEach((s) => enrichedIds.current.add(s.book.google_books_id))
+
+    void Promise.allSettled(
+      toEnrich.map(async (s) => {
+        const reason = await getSuggestionReason({
+          sourceTitle: s.sourceTitle,
+          sourceAuthor: s.sourceAuthor,
+          suggestedTitle: s.book.title,
+          suggestedAuthor: s.book.authors[0] ?? '',
+          suggestedDescription: s.book.description,
+        })
+        if (reason) {
+          _groqReasonCache.set(s.book.google_books_id, reason)
+          setSuggestions((prev) =>
+            prev.map((sug) =>
+              sug.book.google_books_id === s.book.google_books_id ? { ...sug, reason } : sug,
+            ),
+          )
+        }
+      }),
+    )
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status])
 
   const handleConfirm = async (status: BookStatus, finishedAt?: Date) => {
     if (!selected) return
