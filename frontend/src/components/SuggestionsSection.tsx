@@ -88,15 +88,18 @@ export default function SuggestionsSection({ books, onBookAdded }: Props) {
   useEffect(() => {
     const key = books.map((b) => b.id).sort().join(',')
     if (fetchedFor.current === key) return
-    fetchedFor.current = key
 
     setStatus('loading')
     getRecommendations(books)
       .then((s) => {
+        fetchedFor.current = key  // marquer seulement en cas de succès
         setSuggestions(s)
         setStatus(s.length > 0 ? 'ready' : 'empty')
       })
-      .catch(() => setStatus('empty'))
+      .catch(() => {
+        // Ne pas marquer fetchedFor → permet un retry si books change
+        setStatus('empty')
+      })
   }, [books])
 
   const handleConfirm = async (status: BookStatus, finishedAt?: Date) => {
