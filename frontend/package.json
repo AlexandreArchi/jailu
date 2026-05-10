@@ -11,10 +11,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@zxing/browser": "^0.2.0",
     "firebase": "^12.12.1",
     "html5-qrcode": "^2.3.8",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "zxing-wasm": "^3.0.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
