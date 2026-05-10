@@ -829,6 +829,7 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
               <input
                 type="number"
                 min={1}
+                inputMode="numeric"
                 value={pageCount ?? ''}
                 onChange={(e) => setPageCount(e.target.value ? Number(e.target.value) : null)}
                 placeholder="Ex : 320"

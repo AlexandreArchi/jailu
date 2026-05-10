@@ -69,6 +69,11 @@ export default function FriendLibraryScreen({ friend, onClose }: Props) {
   const [selectedBook, setSelectedBook] = useState<UserBook | null>(null)
 
   useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [])
+
+  useEffect(() => {
     getFriendBooks(friend.uid)
       .then(setBooks)
       .catch(() => setBooks([]))

@@ -2,6 +2,14 @@ import { useEffect, useState } from 'react'
 import { getMyFriends, getMyProfile, sendRecommendation } from '../lib/firestore'
 import type { FriendEntry, UserBook } from '../types/book'
 
+// Scroll lock
+function useScrollLock() {
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [])
+}
+
 interface Props {
   book: UserBook
   onClose: () => void
@@ -9,13 +17,18 @@ interface Props {
 
 export default function RecommendBookModal({ book, onClose }: Props) {
   const [friends, setFriends] = useState<FriendEntry[]>([])
+  const [loadingFriends, setLoadingFriends] = useState(true)
   const [selectedUid, setSelectedUid] = useState('')
   const [message, setMessage] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [sent, setSent] = useState(false)
 
+  useScrollLock()
+
   useEffect(() => {
-    void getMyFriends().then(setFriends)
+    getMyFriends()
+      .then(setFriends)
+      .finally(() => setLoadingFriends(false))
   }, [])
 
   const [sendError, setSendError] = useState<string | null>(null)
@@ -53,7 +66,7 @@ export default function RecommendBookModal({ book, onClose }: Props) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm rounded-t-2xl bg-slate-800 sm:rounded-2xl overflow-hidden"
+        className="w-full max-w-sm rounded-t-2xl bg-slate-950 sm:rounded-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 pt-4 pb-3">
@@ -83,7 +96,11 @@ export default function RecommendBookModal({ book, onClose }: Props) {
               <span className="font-medium text-white">{book.title}</span>
             </p>
 
-            {friends.length === 0 ? (
+            {loadingFriends ? (
+              <div className="flex justify-center py-4">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-700 border-t-indigo-500" />
+              </div>
+            ) : friends.length === 0 ? (
               <p className="text-sm text-slate-500">Aucun ami pour l'instant.</p>
             ) : (
               <div className="space-y-2">

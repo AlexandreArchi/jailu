@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { signOut } from 'firebase/auth'
 import type { User } from 'firebase/auth'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
@@ -29,6 +29,11 @@ export default function ProfileModal({ user, profile, onClose, onPhotoUpdated }:
   const [copied, setCopied] = useState(false)
   const [isPublic, setIsPublic] = useState(profile.isPublic ?? true)
   const publicUrl = `https://jailu-prod.web.app/u/${profile.username}`
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [])
 
   const handleTogglePublic = async () => {
     const next = !isPublic

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { deleteMyStory } from '../lib/firestore'
 import { coverPalette } from '../lib/coverColor'
 import type { Story } from '../types/book'
@@ -12,6 +12,13 @@ interface Props {
 
 export default function StoryModal({ stories, isMe, onClose, onDeleted }: Props) {
   const [index, setIndex] = useState(0)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [])
+
   const story = stories[index]
   if (!story) return null
 
@@ -26,10 +33,16 @@ export default function StoryModal({ stories, isMe, onClose, onDeleted }: Props)
   }
 
   const handleDelete = async () => {
-    await deleteMyStory(story.id)
-    onDeleted?.(story.id)
-    if (stories.length <= 1) onClose()
-    else setIndex((i) => Math.max(0, i - 1))
+    if (isDeleting) return
+    setIsDeleting(true)
+    try {
+      await deleteMyStory(story.id)
+      onDeleted?.(story.id)
+      if (stories.length <= 1) onClose()
+      else setIndex((i) => Math.max(0, i - 1))
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   const renderStars = (rating: number) => {
@@ -106,7 +119,8 @@ export default function StoryModal({ stories, isMe, onClose, onDeleted }: Props)
           {isMe && (
             <button
               onClick={() => void handleDelete()}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white/70 backdrop-blur-sm transition hover:bg-white/20 hover:text-white"
+              disabled={isDeleting}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white/70 backdrop-blur-sm transition hover:bg-white/20 hover:text-white disabled:opacity-50"
               aria-label="Supprimer"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">

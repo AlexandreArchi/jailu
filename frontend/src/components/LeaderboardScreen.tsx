@@ -56,6 +56,11 @@ export default function LeaderboardScreen({ myProfile, friends, onClose, onFrien
   )
 
   useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [])
+
+  useEffect(() => {
     const players = [
       { uid: myProfile.uid, fetch: getUserBooks() },
       ...friends.map((f) => ({ uid: f.uid, fetch: getFriendBooks(f.uid) })),

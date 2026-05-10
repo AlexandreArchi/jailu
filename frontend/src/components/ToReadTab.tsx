@@ -110,7 +110,7 @@ export default function ToReadTab({ books, onBookClick }: ToReadTabProps) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto pb-4">
         {filtered.length === 0 ? (
           <p className="py-12 text-center text-sm text-slate-600">Aucun résultat</p>
         ) : (

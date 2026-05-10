@@ -269,7 +269,7 @@ export default function ReadTab({ books, onBookClick, onShowStats }: ReadTabProp
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto pb-4">
         {grouped.length === 0 || (grouped.length === 1 && grouped[0].items.length === 0) ? (
           <p className="py-12 text-center text-sm text-slate-600">
             {total === 0 ? "Aucun livre lu pour l'instant." : 'Aucun résultat'}

@@ -124,8 +124,8 @@ export default function HomeTab({ books, isLoading, displayName, onBookClick, on
 
   if (isLoading) {
     return (
-      <div className="flex-1 overflow-y-auto pb-28">
-        <div className="space-y-7 px-4 pt-5 sm:px-6">
+      <div className="flex-1 overflow-y-auto pb-24">
+        <div className="space-y-7 px-4 pt-4 sm:px-6">
           <div className="skeleton h-20 w-full" />
           <div className="grid grid-cols-2 gap-3">
             <div className="skeleton h-32" />
@@ -163,7 +163,7 @@ export default function HomeTab({ books, isLoading, displayName, onBookClick, on
   }
 
   return (
-    <div className="flex-1 overflow-y-auto pb-28">
+    <div className="flex-1 overflow-y-auto pb-24">
       {/* FAB */}
       <button
         onClick={onGoToSearch}
@@ -175,7 +175,7 @@ export default function HomeTab({ books, isLoading, displayName, onBookClick, on
         </svg>
       </button>
 
-      <div className="space-y-7 px-4 pt-5 sm:px-6">
+      <div className="space-y-7 px-4 pt-4 sm:px-6">
         {/* Reading goal banner */}
         <GoalBanner readCount={readThisYear.length} goal={goal} onGoalChange={onGoalChange} />
 

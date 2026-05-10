@@ -265,7 +265,7 @@ export default function ScanModal({ onScan, onClose }: ScanModalProps) {
             )}
           </>
         )}
-        <p className="text-xs text-white/50 font-mono">{debugLog}</p>
+        {import.meta.env.DEV && <p className="text-xs text-white/50 font-mono">{debugLog}</p>}
       </div>
 
       <button

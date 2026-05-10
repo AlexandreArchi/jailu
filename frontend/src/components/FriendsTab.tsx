@@ -244,8 +244,10 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
   }
 
   const handleRemoveFriend = async (friendUid: string) => {
-    await removeFriend(friendUid)
-    if (viewingFriend?.uid === friendUid) setViewingFriend(null)
+    try {
+      await removeFriend(friendUid)
+      if (viewingFriend?.uid === friendUid) setViewingFriend(null)
+    } catch { /* silently ignore */ }
   }
 
   if (showLeaderboard) {
@@ -396,6 +398,7 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setSearchState({ kind: 'idle' }) }}
               placeholder="Cherche un pseudo…"
+              enterKeyHint="search"
               className="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none"
             />
             {searchQuery && (
@@ -662,12 +665,14 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
               ) : (
                 <div className="space-y-2">
                   {friends.map((friend) => (
-                    <button
+                    <div
                       key={friend.uid}
-                      onClick={() => setViewingFriend(friend)}
-                      className="flex w-full items-center justify-between rounded-2xl bg-slate-800/60 px-4 py-3 ring-1 ring-white/5 text-left transition hover:bg-slate-800 hover:ring-white/10 active:scale-[0.98]"
+                      className="flex w-full items-center justify-between rounded-2xl bg-slate-800/60 px-4 py-3 ring-1 ring-white/5 transition hover:bg-slate-800 hover:ring-white/10"
                     >
-                      <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setViewingFriend(friend)}
+                        className="flex flex-1 items-center gap-3 text-left active:scale-[0.98] transition-transform"
+                      >
                         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-600/20 ring-1 ring-indigo-500/30">
                           <span className="text-sm font-bold text-indigo-400">{friend.username[0].toUpperCase()}</span>
                         </div>
@@ -675,9 +680,9 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
                           <p className="font-semibold text-white">@{friend.username}</p>
                           <p className="text-xs text-slate-500">Voir la bibliothèque →</p>
                         </div>
-                      </div>
+                      </button>
                       <button
-                        onClick={(e) => { e.stopPropagation(); void handleRemoveFriend(friend.uid) }}
+                        onClick={() => void handleRemoveFriend(friend.uid)}
                         className="rounded-lg p-2 text-slate-600 hover:text-red-400 transition"
                         aria-label="Retirer ami"
                       >
@@ -685,7 +690,7 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
                           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                       </button>
-                    </button>
+                    </div>
                   ))}
                 </div>
               )}

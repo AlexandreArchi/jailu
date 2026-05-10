@@ -172,6 +172,8 @@ function GoalEditModal({
           value={targetInput === 0 ? '' : targetInput}
           onChange={(e) => setTargetInput(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))}
           placeholder="Ex : 20"
+          autoFocus
+          inputMode="numeric"
           className="mb-5 w-full rounded-xl bg-slate-700 px-4 py-3 text-2xl font-bold text-white outline-none ring-1 ring-slate-600 focus:ring-indigo-500 text-center transition"
         />
 

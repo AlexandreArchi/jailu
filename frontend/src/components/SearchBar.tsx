@@ -71,6 +71,8 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
           placeholder={currentMode.placeholder}
           value={value}
           onChange={(e) => setValue(e.target.value)}
+          autoFocus
+          enterKeyHint="search"
           className="w-full rounded-xl bg-slate-800 px-4 py-3 pr-10 text-white placeholder-slate-500 outline-none ring-1 ring-slate-700 focus:ring-indigo-500"
         />
         {isLoading ? (
