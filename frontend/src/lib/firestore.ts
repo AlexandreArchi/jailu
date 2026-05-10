@@ -305,7 +305,7 @@ export async function unfollowUser(theirUid: string): Promise<void> {
   await batch.commit()
 }
 
-export async function sendFollowRequest(theirUid: string, theirUsername: string): Promise<void> {
+export async function sendFollowRequest(theirUid: string, _theirUsername: string): Promise<void> {
   const myUid = auth.currentUser?.uid
   if (!myUid) throw new Error('Non authentifié')
   const myProfile = await getMyProfile()
