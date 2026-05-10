@@ -52,3 +52,4 @@ async def generate_suggestion_reason(
     except Exception as e:
         logger.warning('Groq error for "%s": %s', suggested_title, e)
         return None
+# Groq integration active
