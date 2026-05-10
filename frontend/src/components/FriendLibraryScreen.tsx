@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { getFriendBooks } from '../lib/firestore'
-import type { FriendEntry, UserBook } from '../types/book'
+import { getFriendBooks, getProfileByUid } from '../lib/firestore'
+import type { FollowEntry, UserBook, UserProfile } from '../types/book'
 import BookDetailModal from './BookDetailModal'
 import { coverPalette } from '../lib/coverColor'
 
 interface Props {
-  friend: FriendEntry
+  entry: FollowEntry
   onClose: () => void
 }
 
@@ -63,10 +63,11 @@ function ReadingItem({ book }: { book: UserBook }) {
   )
 }
 
-export default function FriendLibraryScreen({ friend, onClose }: Props) {
+export default function FriendLibraryScreen({ entry, onClose }: Props) {
   const [books, setBooks] = useState<UserBook[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedBook, setSelectedBook] = useState<UserBook | null>(null)
+  const [profile, setProfile] = useState<UserProfile | null>(null)
 
   useEffect(() => {
     document.body.style.overflow = 'hidden'
@@ -74,11 +75,14 @@ export default function FriendLibraryScreen({ friend, onClose }: Props) {
   }, [])
 
   useEffect(() => {
-    getFriendBooks(friend.uid)
-      .then(setBooks)
-      .catch(() => setBooks([]))
-      .finally(() => setIsLoading(false))
-  }, [friend.uid])
+    void Promise.all([
+      getFriendBooks(entry.uid),
+      getProfileByUid(entry.uid),
+    ]).then(([b, p]) => {
+      setBooks(b)
+      setProfile(p)
+    }).catch(() => setBooks([])).finally(() => setIsLoading(false))
+  }, [entry.uid])
 
   const read = books.filter((b) => b.status === 'read')
   const reading = books.filter((b) => b.status === 'reading')
@@ -100,6 +104,9 @@ export default function FriendLibraryScreen({ friend, onClose }: Props) {
     else grouped.push({ label: key, items: [book] })
   }
 
+  const followersCount = profile?.followersCount ?? 0
+  const followingCount = profile?.followingCount ?? 0
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-950">
       {selectedBook && (
@@ -119,9 +126,18 @@ export default function FriendLibraryScreen({ friend, onClose }: Props) {
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <div>
-          <h1 className="text-lg font-bold text-white">@{friend.username}</h1>
-          <p className="text-xs text-slate-500">Ami depuis le {friend.since.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</p>
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-indigo-600/20 ring-1 ring-indigo-500/30 flex items-center justify-center">
+            {entry.photoURL ? (
+              <img src={entry.photoURL} alt={entry.username} className="h-full w-full object-cover" />
+            ) : (
+              <span className="text-base font-bold text-indigo-400">{entry.username[0].toUpperCase()}</span>
+            )}
+          </div>
+          <div>
+            <h1 className="text-base font-bold text-white">@{entry.username}</h1>
+            {profile?.bio && <p className="text-xs text-slate-400 truncate max-w-[200px]">{profile.bio}</p>}
+          </div>
         </div>
       </div>
 
@@ -132,24 +148,35 @@ export default function FriendLibraryScreen({ friend, onClose }: Props) {
       ) : (
         <div className="flex-1 overflow-y-auto pb-8">
           <div className="space-y-6 px-4 sm:px-6">
-            {/* Stats */}
+            {/* Stats — Instagram style */}
             <div className="rounded-2xl bg-gradient-to-br from-indigo-900/80 via-slate-800 to-slate-800 p-5 ring-1 ring-indigo-800/30">
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-4 gap-3 text-center">
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-indigo-300/70">Lus</p>
-                  <p className="mt-1 text-3xl font-bold text-white">{read.length}</p>
+                  <p className="text-2xl font-bold text-white">{read.length}</p>
+                  <p className="text-[10px] font-medium text-indigo-300/70 mt-0.5">Lus</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-indigo-300/70">Pages</p>
-                  <p className="mt-1 text-3xl font-bold text-white">
+                  <p className="text-2xl font-bold text-white">
                     {pagesRead > 0 ? (pagesRead >= 1000 ? `${Math.round(pagesRead / 1000)}k` : pagesRead) : '—'}
                   </p>
+                  <p className="text-[10px] font-medium text-indigo-300/70 mt-0.5">Pages</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-indigo-300/70">Note moy.</p>
-                  <p className="mt-1 text-3xl font-bold text-white">{avgRating ?? '—'}</p>
+                  <p className="text-2xl font-bold text-white">{followersCount}</p>
+                  <p className="text-[10px] font-medium text-indigo-300/70 mt-0.5">Abonnés</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-white">{followingCount}</p>
+                  <p className="text-[10px] font-medium text-indigo-300/70 mt-0.5">Abonnements</p>
                 </div>
               </div>
+              {avgRating && (
+                <div className="mt-3 border-t border-white/10 pt-3 flex items-center justify-center gap-1.5">
+                  <span className="text-amber-400 text-sm">★</span>
+                  <span className="text-sm font-semibold text-white">{avgRating}</span>
+                  <span className="text-xs text-slate-500">note moyenne</span>
+                </div>
+              )}
             </div>
 
             {/* En cours */}

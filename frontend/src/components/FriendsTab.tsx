@@ -2,23 +2,24 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   searchUserByUsername,
-  sendFriendRequest,
-  cancelFriendRequest,
-  acceptFriendRequest,
-  rejectFriendRequest,
-  removeFriend,
-  checkFriendshipStatus,
-  subscribeToPendingRequests,
-  subscribeToFriends,
+  followUser,
+  unfollowUser,
+  sendFollowRequest,
+  cancelFollowRequest,
+  acceptFollowRequest,
+  rejectFollowRequest,
+  checkFollowStatus,
+  subscribeToFollowing,
+  subscribeToFollowRequests,
   subscribeToRecommendations,
   deleteRecommendation,
   addBook,
   getFriendsStories,
   getMyStories,
   getFriendBooks,
-  type FriendshipStatus,
 } from '../lib/firestore'
-import type { BookResult, FriendEntry, FriendRequest, Recommendation, Story, UserBook, UserProfile } from '../types/book'
+import type { BookResult, FollowEntry, Recommendation, Story, UserBook, UserProfile } from '../types/book'
+import type { FollowStatus } from '../types/book'
 import FriendLibraryScreen from './FriendLibraryScreen'
 import LeaderboardScreen from './LeaderboardScreen'
 import StoryModal from './StoryModal'
@@ -34,38 +35,13 @@ type SearchState =
   | { kind: 'loading' }
   | { kind: 'not_found' }
   | { kind: 'self' }
-  | { kind: 'found'; profile: UserProfile; status: FriendshipStatus }
-
-function SwipeToDelete({ onDelete, children }: { onDelete: () => void; children: React.ReactNode }) {
-  const startX = useRef(0)
-  const [offset, setOffset] = useState(0)
-  const dragging = useRef(false)
-
-  return (
-    <div
-      style={{ transform: `translateX(${offset}px)`, transition: dragging.current ? 'none' : 'transform 250ms ease-out, opacity 250ms', opacity: offset < -120 ? 0 : 1 }}
-      onTouchStart={(e) => { startX.current = e.touches[0].clientX; dragging.current = true }}
-      onTouchMove={(e) => {
-        const dx = startX.current - e.touches[0].clientX
-        if (dx > 0) setOffset(-Math.min(dx, 160))
-      }}
-      onTouchEnd={() => {
-        dragging.current = false
-        if (offset < -80) { setOffset(-400); setTimeout(onDelete, 260) }
-        else setOffset(0)
-      }}
-      onTouchCancel={() => { dragging.current = false; setOffset(0) }}
-    >
-      {children}
-    </div>
-  )
-}
+  | { kind: 'found'; profile: UserProfile; status: FollowStatus }
 
 export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: Props) {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchState, setSearchState] = useState<SearchState>({ kind: 'idle' })
-  const [pendingRequests, setPendingRequests] = useState<FriendRequest[]>([])
-  const [friends, setFriends] = useState<FriendEntry[]>([])
+  const [followRequests, setFollowRequests] = useState<FollowEntry[]>([])
+  const [following, setFollowing] = useState<FollowEntry[]>([])
   const [recommendations, setRecommendations] = useState<Recommendation[]>([])
   const [friendStories, setFriendStories] = useState<Story[]>([])
   const [myStories, setMyStories] = useState<Story[]>([])
@@ -75,37 +51,36 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
     catch { return new Set() }
   })
   const [isLoading, setIsLoading] = useState(true)
-  const [friendsReading, setFriendsReading] = useState<{ friend: FriendEntry; book: UserBook }[]>([])
-  const [viewingFriend, setViewingFriend] = useState<FriendEntry | null>(null)
+  const [followingReading, setFollowingReading] = useState<{ entry: FollowEntry; book: UserBook }[]>([])
+  const [viewingUser, setViewingUser] = useState<FollowEntry | null>(null)
   const [showLeaderboard, setShowLeaderboard] = useState(false)
   const [selectedRec, setSelectedRec] = useState<Recommendation | null>(null)
   const [addingRec, setAddingRec] = useState(false)
   const [recDescription, setRecDescription] = useState<string | null>(null)
   const [loadingDesc, setLoadingDesc] = useState(false)
   const [showRecFullDesc, setShowRecFullDesc] = useState(false)
+  const followingUidKey = following.map((f) => f.uid).sort().join(',')
+  const loadedRef = useRef(false)
 
   useEffect(() => {
-    const unsubReqs = subscribeToPendingRequests((reqs) => {
-      setPendingRequests(reqs)
-      onPendingCountChange(reqs.length)
+    const unsubFollowing = subscribeToFollowing((entries) => {
+      setFollowing(entries)
       setIsLoading(false)
+      loadedRef.current = true
     })
-    const unsubFriends = subscribeToFriends((frs) => {
-      setFriends(frs)
-      setIsLoading(false)
+    const unsubRequests = subscribeToFollowRequests((reqs) => {
+      setFollowRequests(reqs)
+      onPendingCountChange(reqs.length)
     })
     const unsubRecs = subscribeToRecommendations(setRecommendations)
-    return () => { unsubReqs(); unsubFriends(); unsubRecs() }
-  }, [myUid])
-
-  // Stable key: only re-fetch when actual friend UIDs change, not on every snapshot ref
-  const friendsUidKey = friends.map((f) => f.uid).sort().join(',')
+    return () => { unsubFollowing(); unsubRequests(); unsubRecs() }
+  }, [myUid, onPendingCountChange])
 
   useEffect(() => {
-    if (!friendsUidKey) return
-    void getFriendsStories(friends).then(setFriendStories).catch(() => setFriendStories([]))
+    if (!followingUidKey) return
+    void getFriendsStories(following).then(setFriendStories).catch(() => setFriendStories([]))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [friendsUidKey])
+  }, [followingUidKey])
 
   useEffect(() => {
     void getMyStories()
@@ -114,21 +89,21 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
   }, [myProfile.username])
 
   useEffect(() => {
-    if (!friendsUidKey) { setFriendsReading([]); return }
-    const candidates = friends.slice(0, 6)
+    if (!followingUidKey) { setFollowingReading([]); return }
+    const candidates = following.slice(0, 6)
     void Promise.allSettled(candidates.map((f) => getFriendBooks(f.uid))).then((results) => {
-      const reading: { friend: FriendEntry; book: UserBook }[] = []
+      const reading: { entry: FollowEntry; book: UserBook }[] = []
       for (let i = 0; i < candidates.length; i++) {
         if (reading.length >= 3) break
         const r = results[i]
         if (r.status !== 'fulfilled') continue
         const readingBook = r.value.find((b) => b.status === 'reading')
-        if (readingBook) reading.push({ friend: candidates[i], book: readingBook })
+        if (readingBook) reading.push({ entry: candidates[i], book: readingBook })
       }
-      setFriendsReading(reading)
+      setFollowingReading(reading)
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [friendsUidKey])
+  }, [followingUidKey])
 
   useEffect(() => {
     if (selectedRec) {
@@ -170,41 +145,56 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
       const profile = await searchUserByUsername(q)
       if (!profile) { setSearchState({ kind: 'not_found' }); return }
       if (profile.uid === myUid) { setSearchState({ kind: 'self' }); return }
-      const status = await checkFriendshipStatus(profile.uid)
+      const status = await checkFollowStatus(profile.uid)
       setSearchState({ kind: 'found', profile, status })
     } catch {
       setSearchState({ kind: 'idle' })
     }
   }
 
-  const handleSendRequest = async (toUid: string) => {
+  const handleFollow = async (profile: UserProfile) => {
     try {
-      await sendFriendRequest(toUid)
-      setSearchState((prev) =>
-        prev.kind === 'found' ? { ...prev, status: 'pending_sent' } : prev,
-      )
+      if (profile.isPublic !== false) {
+        // Public profile → follow directly
+        await followUser(profile.uid, profile.username, profile.photoURL)
+        setSearchState((prev) => prev.kind === 'found' ? { ...prev, status: 'following' } : prev)
+      } else {
+        // Private profile → send request
+        await sendFollowRequest(profile.uid, profile.username)
+        setSearchState((prev) => prev.kind === 'found' ? { ...prev, status: 'pending' } : prev)
+      }
     } catch { /* silently ignore */ }
   }
 
-  const handleCancelRequest = async (toUid: string) => {
+  const handleUnfollow = async (theirUid: string) => {
     try {
-      await cancelFriendRequest(toUid)
-      setSearchState((prev) =>
-        prev.kind === 'found' ? { ...prev, status: 'none' } : prev,
-      )
+      await unfollowUser(theirUid)
+      setSearchState((prev) => prev.kind === 'found' ? { ...prev, status: 'none' } : prev)
     } catch { /* silently ignore */ }
   }
 
-  const handleAccept = async (req: FriendRequest) => {
+  const handleCancelRequest = async (theirUid: string) => {
     try {
-      await acceptFriendRequest(req.uid, req.username)
-      setSearchState({ kind: 'idle' })
+      await cancelFollowRequest(theirUid)
+      setSearchState((prev) => prev.kind === 'found' ? { ...prev, status: 'none' } : prev)
     } catch { /* silently ignore */ }
   }
 
-  const handleReject = async (fromUid: string) => {
+  const handleAcceptRequest = async (req: FollowEntry) => {
     try {
-      await rejectFriendRequest(fromUid)
+      await acceptFollowRequest(req.uid, req.username, req.photoURL)
+    } catch { /* silently ignore */ }
+  }
+
+  const handleRejectRequest = async (uid: string) => {
+    try {
+      await rejectFollowRequest(uid)
+    } catch { /* silently ignore */ }
+  }
+
+  const handleUnfollowFromList = async (uid: string) => {
+    try {
+      await unfollowUser(uid)
     } catch { /* silently ignore */ }
   }
 
@@ -252,26 +242,19 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
     }
   }
 
-  const handleRemoveFriend = async (friendUid: string) => {
-    try {
-      await removeFriend(friendUid)
-      if (viewingFriend?.uid === friendUid) setViewingFriend(null)
-    } catch { /* silently ignore */ }
-  }
-
   if (showLeaderboard) {
     return (
       <LeaderboardScreen
         myProfile={myProfile}
-        friends={friends}
+        following={following}
         onClose={() => setShowLeaderboard(false)}
-        onFriendClick={(friend) => { setShowLeaderboard(false); setViewingFriend(friend) }}
+        onUserClick={(entry) => { setShowLeaderboard(false); setViewingUser(entry) }}
       />
     )
   }
 
-  if (viewingFriend) {
-    return <FriendLibraryScreen friend={viewingFriend} onClose={() => setViewingFriend(null)} />
+  if (viewingUser) {
+    return <FriendLibraryScreen entry={viewingUser} onClose={() => setViewingUser(null)} />
   }
 
   return (
@@ -289,7 +272,8 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
           }}
         />
       )}
-      {/* Recommendation detail modal — portal to body to escape stacking context */}
+
+      {/* Recommendation detail modal */}
       {selectedRec && createPortal(
         <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/70" onClick={() => setSelectedRec(null)}>
           <div
@@ -297,12 +281,9 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
             style={{ maxHeight: '80vh' }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Handle bar */}
             <div className="flex justify-center pt-3 pb-2 shrink-0">
               <div className="h-1 w-10 rounded-full bg-slate-700" />
             </div>
-
-            {/* Header */}
             <div className="flex items-center justify-between px-5 pb-3 shrink-0">
               <p className="text-xs font-semibold text-indigo-400 uppercase tracking-widest">
                 @{selectedRec.fromUsername} recommande
@@ -310,15 +291,12 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
               <button
                 onClick={() => setSelectedRec(null)}
                 className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-800 text-slate-400 hover:text-white transition"
-                aria-label="Fermer"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-3.5 w-3.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
-
-            {/* Book info */}
             <div className="flex items-start gap-4 px-5 pb-4 shrink-0">
               <div className="h-20 w-14 shrink-0 overflow-hidden rounded-xl bg-slate-800 shadow-xl ring-1 ring-white/10">
                 <img
@@ -336,8 +314,6 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
                 )}
               </div>
             </div>
-
-            {/* Synopsis — scrollable middle zone, expands downward */}
             <div className="flex-1 overflow-y-auto px-5 pb-3 min-h-0">
               {loadingDesc ? (
                 <div className="flex justify-center py-2">
@@ -346,28 +322,17 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
               ) : recDescription ? (
                 <>
                   <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-600">Synopsis</p>
-                  <div
-                    style={{
-                      maxHeight: showRecFullDesc ? '600px' : '96px',
-                      overflow: 'hidden',
-                      transition: 'max-height 0.3s ease',
-                    }}
-                  >
+                  <div style={{ maxHeight: showRecFullDesc ? '600px' : '96px', overflow: 'hidden', transition: 'max-height 0.3s ease' }}>
                     <p className="text-sm leading-relaxed text-slate-400">{recDescription}</p>
                   </div>
                   {recDescription.length > 200 && (
-                    <button
-                      onClick={() => setShowRecFullDesc((v) => !v)}
-                      className="mt-1.5 text-xs text-indigo-400 transition hover:text-indigo-300"
-                    >
+                    <button onClick={() => setShowRecFullDesc((v) => !v)} className="mt-1.5 text-xs text-indigo-400 transition hover:text-indigo-300">
                       {showRecFullDesc ? '↑ Voir moins' : '↓ Voir plus'}
                     </button>
                   )}
                 </>
               ) : null}
             </div>
-
-            {/* Action — always pinned at bottom */}
             <div className="shrink-0 px-5 pt-2 pb-8">
               <button
                 onClick={() => void handleAddFromRec(selectedRec)}
@@ -382,15 +347,14 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
         document.body
       )}
 
-      {/* Header + search */}
+      {/* Header */}
       <div className="px-4 pt-4 pb-3 sm:px-6 space-y-3">
         <div className="flex items-center justify-between">
-          <h1 className="text-lg font-bold text-white">Amis</h1>
-          {friends.length > 0 && (
+          <h1 className="text-lg font-bold text-white">Réseau</h1>
+          {following.length > 0 && (
             <button
               onClick={() => setShowLeaderboard(true)}
               className="flex items-center gap-1.5 rounded-xl bg-slate-800 px-3 py-2 text-slate-400 transition hover:text-white"
-              aria-label="Classement"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-4.5A5.25 5.25 0 0012 9a5.25 5.25 0 00-4.5 5.25v4.5m9 0H7.5M6 9H4.5m15 0H18M12 3v1.5m4.5.75-1.06 1.06M7.5 5.25 6.44 6.31" />
@@ -399,6 +363,8 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
             </button>
           )}
         </div>
+
+        {/* Search */}
         <form onSubmit={handleSearch} className="flex gap-2">
           <div className="flex flex-1 items-center gap-2 rounded-xl bg-slate-800 px-3 py-2.5 ring-1 ring-slate-700 focus-within:ring-indigo-500 transition">
             <span className="text-slate-500 font-medium text-sm">@</span>
@@ -441,37 +407,56 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
         )}
         {searchState.kind === 'found' && (
           <div className="flex items-center justify-between rounded-2xl bg-slate-800/60 px-4 py-3 ring-1 ring-white/5">
-            <div>
-              <p className="font-semibold text-white">@{searchState.profile.username}</p>
-              <p className="text-xs text-slate-500">Membre depuis {searchState.profile.createdAt.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</p>
+            <button
+              onClick={() => setViewingUser({
+                uid: searchState.profile.uid,
+                username: searchState.profile.username,
+                photoURL: searchState.profile.photoURL,
+                followedAt: new Date(),
+              })}
+              className="flex items-center gap-3 text-left flex-1 min-w-0"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-600/20 ring-1 ring-indigo-500/30">
+                {searchState.profile.photoURL ? (
+                  <img src={searchState.profile.photoURL} alt={searchState.profile.username} className="h-full w-full rounded-full object-cover" />
+                ) : (
+                  <span className="text-sm font-bold text-indigo-400">{searchState.profile.username[0].toUpperCase()}</span>
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="font-semibold text-white">@{searchState.profile.username}</p>
+                <p className="text-xs text-slate-500 truncate">
+                  {(searchState.profile.followersCount ?? 0)} abonnés
+                  {searchState.profile.isPublic === false && ' · 🔒 Privé'}
+                </p>
+              </div>
+            </button>
+            <div className="shrink-0 ml-3">
+              {searchState.status === 'following' && (
+                <button
+                  onClick={() => handleUnfollow(searchState.profile.uid)}
+                  className="rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-red-900/40 hover:text-red-400 transition"
+                >
+                  Suivi ✓
+                </button>
+              )}
+              {searchState.status === 'pending' && (
+                <button
+                  onClick={() => handleCancelRequest(searchState.profile.uid)}
+                  className="rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-600 transition"
+                >
+                  Demande envoyée
+                </button>
+              )}
+              {searchState.status === 'none' && (
+                <button
+                  onClick={() => handleFollow(searchState.profile)}
+                  className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 transition"
+                >
+                  Suivre
+                </button>
+              )}
             </div>
-            {searchState.status === 'friends' && (
-              <span className="text-xs font-medium text-emerald-400">Amis ✓</span>
-            )}
-            {searchState.status === 'pending_sent' && (
-              <button
-                onClick={() => handleCancelRequest(searchState.profile.uid)}
-                className="rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-600 transition"
-              >
-                Annuler
-              </button>
-            )}
-            {searchState.status === 'pending_received' && (
-              <button
-                onClick={() => handleAccept({ uid: searchState.profile.uid, username: searchState.profile.username, createdAt: new Date() })}
-                className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 transition"
-              >
-                Accepter
-              </button>
-            )}
-            {searchState.status === 'none' && (
-              <button
-                onClick={() => handleSendRequest(searchState.profile.uid)}
-                className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 transition"
-              >
-                Ajouter
-              </button>
-            )}
           </div>
         )}
       </div>
@@ -480,34 +465,32 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
       {storiesByUid.size > 0 && (
         <div className="px-4 pt-1 pb-3 sm:px-6">
           <div className="flex gap-4 overflow-x-auto pb-2 pt-1 -mx-4 px-4 scrollbar-hide">
-            {/* My stories bubble */}
             {myStories.length > 0 && (() => {
               const hasUnseen = myStories.some((s) => !seenIds.has(s.id))
               return (
-                <button
-                  key="me"
-                  onClick={() => openStories(myUid, myStories, true)}
-                  className="flex shrink-0 flex-col items-center gap-1.5"
-                >
+                <button key="me" onClick={() => openStories(myUid, myStories, true)} className="flex shrink-0 flex-col items-center gap-1.5">
                   <div className={`flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 transition ${hasUnseen ? 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-slate-950' : 'ring-1 ring-slate-700'}`}>
-                    <span className="text-lg font-bold text-indigo-300">{myProfile.username[0].toUpperCase()}</span>
+                    {myProfile.photoURL ? (
+                      <img src={myProfile.photoURL} alt={myProfile.username} className="h-full w-full rounded-full object-cover" />
+                    ) : (
+                      <span className="text-lg font-bold text-indigo-300">{myProfile.username[0].toUpperCase()}</span>
+                    )}
                   </div>
                   <span className="max-w-[56px] truncate text-[10px] text-slate-400">Toi</span>
                 </button>
               )
             })()}
-            {/* Friends stories bubbles */}
-            {friends.filter((f) => storiesByUid.has(f.uid)).map((f) => {
+            {following.filter((f) => storiesByUid.has(f.uid)).map((f) => {
               const stories = storiesByUid.get(f.uid)!
               const hasUnseen = stories.some((s) => !seenIds.has(s.id))
               return (
-                <button
-                  key={f.uid}
-                  onClick={() => openStories(f.uid, stories, false)}
-                  className="flex shrink-0 flex-col items-center gap-1.5"
-                >
+                <button key={f.uid} onClick={() => openStories(f.uid, stories, false)} className="flex shrink-0 flex-col items-center gap-1.5">
                   <div className={`flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 transition ${hasUnseen ? 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-slate-950' : 'ring-1 ring-slate-700'}`}>
-                    <span className="text-lg font-bold text-slate-300">{f.username[0].toUpperCase()}</span>
+                    {f.photoURL ? (
+                      <img src={f.photoURL} alt={f.username} className="h-full w-full rounded-full object-cover" />
+                    ) : (
+                      <span className="text-lg font-bold text-slate-300">{f.username[0].toUpperCase()}</span>
+                    )}
                   </div>
                   <span className="max-w-[56px] truncate text-[10px] text-slate-400">@{f.username}</span>
                 </button>
@@ -517,18 +500,17 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
         </div>
       )}
 
-      {/* Ce que lisent tes amis en ce moment */}
-      {friendsReading.length > 0 && (
+      {/* Ce que tes abonnements lisent en ce moment */}
+      {followingReading.length > 0 && (
         <div className="px-4 sm:px-6 pb-3">
-          <h2 className="mb-2.5 text-sm font-semibold text-white">📖 Ce que lisent tes amis</h2>
+          <h2 className="mb-2.5 text-sm font-semibold text-white">📖 Ce que lisent tes abonnements</h2>
           <div className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-hide">
-            {friendsReading.map(({ friend, book }) => (
+            {followingReading.map(({ entry, book }) => (
               <button
-                key={friend.uid}
-                onClick={() => setViewingFriend(friend)}
+                key={entry.uid}
+                onClick={() => setViewingUser(entry)}
                 className="flex shrink-0 flex-col gap-2 w-32 text-left transition active:scale-[0.97]"
               >
-                {/* Cover */}
                 <div className="aspect-[2/3] w-full overflow-hidden rounded-xl bg-slate-800 ring-1 ring-white/5 shadow-lg">
                   {book.coverUrl || book.thumbnailUrl ? (
                     <img
@@ -537,11 +519,8 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
                       className="h-full w-full object-cover"
                       onError={(e) => {
                         const img = e.target as HTMLImageElement
-                        if (book.thumbnailUrl && img.src !== book.thumbnailUrl) {
-                          img.src = book.thumbnailUrl
-                        } else {
-                          img.style.display = 'none'
-                        }
+                        if (book.thumbnailUrl && img.src !== book.thumbnailUrl) img.src = book.thumbnailUrl
+                        else img.style.display = 'none'
                       }}
                     />
                   ) : (
@@ -550,9 +529,8 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
                     </div>
                   )}
                 </div>
-                {/* Meta */}
                 <div>
-                  <p className="text-[10px] font-semibold text-indigo-400 leading-tight">@{friend.username} lit</p>
+                  <p className="text-[10px] font-semibold text-indigo-400 leading-tight">@{entry.username} lit</p>
                   <p className="text-xs font-semibold text-white leading-tight line-clamp-2 mt-0.5">{book.title}</p>
                 </div>
               </button>
@@ -577,74 +555,72 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
                 </h2>
                 <div className="space-y-2">
                   {recommendations.map((rec) => (
-                    <SwipeToDelete key={rec.id} onDelete={() => void deleteRecommendation(rec.id)}>
-                      <div className="flex items-start gap-3 rounded-2xl bg-slate-800/60 ring-1 ring-white/5 overflow-hidden">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedRec(rec)}
-                          className="flex flex-1 items-start gap-3 px-4 py-3 text-left transition active:bg-slate-700/40"
-                        >
-                          <div className="h-14 w-10 shrink-0 overflow-hidden rounded-lg bg-slate-700">
-                            <img
-                              src={toHttps(rec.bookThumbnailUrl ?? rec.bookCoverUrl)}
-                              alt={rec.bookTitle}
-                              className="h-full w-full object-cover"
-                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                            />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs text-indigo-400 font-medium">@{rec.fromUsername} recommande</p>
-                            <p className="text-sm font-semibold text-white truncate">{rec.bookTitle}</p>
-                            <p className="text-xs text-slate-500 truncate">{rec.bookAuthors.join(', ')}</p>
-                            {rec.message && (
-                              <p className="mt-1 text-xs text-slate-400 italic">"{rec.message}"</p>
-                            )}
-                          </div>
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="mt-1 h-4 w-4 shrink-0 text-slate-600">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => void deleteRecommendation(rec.id)}
-                          className="shrink-0 self-stretch flex items-center justify-center w-11 text-slate-600 hover:text-slate-400 transition"
-                          aria-label="Ignorer"
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
-                    </SwipeToDelete>
+                    <div key={rec.id} className="flex items-start gap-3 rounded-2xl bg-slate-800/60 ring-1 ring-white/5 overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRec(rec)}
+                        className="flex flex-1 items-start gap-3 px-4 py-3 text-left transition active:bg-slate-700/40"
+                      >
+                        <div className="h-14 w-10 shrink-0 overflow-hidden rounded-lg bg-slate-700">
+                          <img
+                            src={toHttps(rec.bookThumbnailUrl ?? rec.bookCoverUrl)}
+                            alt={rec.bookTitle}
+                            className="h-full w-full object-cover"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs text-indigo-400 font-medium">@{rec.fromUsername} recommande</p>
+                          <p className="text-sm font-semibold text-white truncate">{rec.bookTitle}</p>
+                          <p className="text-xs text-slate-500 truncate">{rec.bookAuthors.join(', ')}</p>
+                          {rec.message && <p className="mt-1 text-xs text-slate-400 italic">"{rec.message}"</p>}
+                        </div>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="mt-1 h-4 w-4 shrink-0 text-slate-600">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => void deleteRecommendation(rec.id)}
+                        className="shrink-0 self-stretch flex items-center justify-center w-11 text-slate-600 hover:text-slate-400 transition"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
                   ))}
                 </div>
               </section>
             )}
 
-            {/* Demandes reçues */}
-            {pendingRequests.length > 0 && (
+            {/* Demandes de suivi reçues */}
+            {followRequests.length > 0 && (
               <section>
                 <h2 className="mb-3 text-sm font-semibold text-white">
-                  Demandes reçues
-                  <span className="ml-2 rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white">{pendingRequests.length}</span>
+                  Demandes de suivi
+                  <span className="ml-2 rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white">{followRequests.length}</span>
                 </h2>
                 <div className="space-y-2">
-                  {pendingRequests.map((req) => (
+                  {followRequests.map((req) => (
                     <div key={req.uid} className="flex items-center justify-between rounded-2xl bg-slate-800/60 px-4 py-3 ring-1 ring-white/5">
-                      <div>
-                        <p className="font-semibold text-white">@{req.username}</p>
-                        <p className="text-xs text-slate-500">{req.createdAt.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</p>
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-700">
+                          {req.photoURL ? (
+                            <img src={req.photoURL} alt={req.username} className="h-full w-full rounded-full object-cover" />
+                          ) : (
+                            <span className="text-sm font-bold text-slate-300">{req.username[0].toUpperCase()}</span>
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-white">@{req.username}</p>
+                          <p className="text-xs text-slate-500">{req.followedAt.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</p>
+                        </div>
                       </div>
                       <div className="flex gap-2">
-                        <button
-                          onClick={() => handleReject(req.uid)}
-                          className="rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-600 transition"
-                        >
+                        <button onClick={() => void handleRejectRequest(req.uid)} className="rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-600 transition">
                           Refuser
                         </button>
-                        <button
-                          onClick={() => handleAccept(req)}
-                          className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 transition"
-                        >
+                        <button onClick={() => void handleAcceptRequest(req)} className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 transition">
                           Accepter
                         </button>
                       </div>
@@ -654,46 +630,47 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
               </section>
             )}
 
-            {/* Mes amis */}
+            {/* Abonnements */}
             <section>
               <h2 className="mb-3 text-sm font-semibold text-white">
-                Mes amis
-                {friends.length > 0 && (
-                  <span className="ml-2 rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-slate-400">{friends.length}</span>
+                Abonnements
+                {following.length > 0 && (
+                  <span className="ml-2 rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-slate-400">{following.length}</span>
                 )}
               </h2>
-              {friends.length === 0 ? (
+              {following.length === 0 ? (
                 <div className="flex flex-col items-center py-12 text-center">
                   <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-800/60 ring-1 ring-white/5">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="h-7 w-7 text-slate-500">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
                     </svg>
                   </div>
-                  <p className="text-sm text-slate-500">Aucun ami pour l'instant.<br />Cherche un pseudo pour commencer !</p>
+                  <p className="text-sm text-slate-500">Tu ne suis encore personne.<br />Cherche un pseudo pour commencer !</p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {friends.map((friend) => (
-                    <div
-                      key={friend.uid}
-                      className="flex w-full items-center justify-between rounded-2xl bg-slate-800/60 px-4 py-3 ring-1 ring-white/5 transition hover:bg-slate-800 hover:ring-white/10"
-                    >
+                  {following.map((entry) => (
+                    <div key={entry.uid} className="flex w-full items-center justify-between rounded-2xl bg-slate-800/60 px-4 py-3 ring-1 ring-white/5 transition hover:bg-slate-800 hover:ring-white/10">
                       <button
-                        onClick={() => setViewingFriend(friend)}
+                        onClick={() => setViewingUser(entry)}
                         className="flex flex-1 items-center gap-3 text-left active:scale-[0.98] transition-transform"
                       >
                         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-600/20 ring-1 ring-indigo-500/30">
-                          <span className="text-sm font-bold text-indigo-400">{friend.username[0].toUpperCase()}</span>
+                          {entry.photoURL ? (
+                            <img src={entry.photoURL} alt={entry.username} className="h-full w-full rounded-full object-cover" />
+                          ) : (
+                            <span className="text-sm font-bold text-indigo-400">{entry.username[0].toUpperCase()}</span>
+                          )}
                         </div>
                         <div>
-                          <p className="font-semibold text-white">@{friend.username}</p>
+                          <p className="font-semibold text-white">@{entry.username}</p>
                           <p className="text-xs text-slate-500">Voir la bibliothèque →</p>
                         </div>
                       </button>
                       <button
-                        onClick={() => void handleRemoveFriend(friend.uid)}
+                        onClick={() => void handleUnfollowFromList(entry.uid)}
                         className="rounded-lg p-2 text-slate-600 hover:text-red-400 transition"
-                        aria-label="Retirer ami"
+                        aria-label="Ne plus suivre"
                       >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />

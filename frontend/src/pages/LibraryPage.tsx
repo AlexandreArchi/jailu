@@ -157,6 +157,7 @@ export default function LibraryPage({ user }: LibraryPageProps) {
           profile={myProfile}
           onClose={() => setShowProfile(false)}
           onPhotoUpdated={(url) => setMyProfile({ ...myProfile, photoURL: url })}
+          onProfileUpdated={(p) => setMyProfile(p)}
         />
       )}
 

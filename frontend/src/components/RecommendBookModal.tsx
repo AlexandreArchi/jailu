@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { getMyFriends, getMyProfile, sendRecommendation } from '../lib/firestore'
-import type { FriendEntry, UserBook } from '../types/book'
+import { getMyFollowing, getMyProfile, sendRecommendation } from '../lib/firestore'
+import type { FollowEntry, UserBook } from '../types/book'
 
 // Scroll lock
 function useScrollLock() {
@@ -16,8 +16,8 @@ interface Props {
 }
 
 export default function RecommendBookModal({ book, onClose }: Props) {
-  const [friends, setFriends] = useState<FriendEntry[]>([])
-  const [loadingFriends, setLoadingFriends] = useState(true)
+  const [following, setFollowing] = useState<FollowEntry[]>([])
+  const [loadingFollowing, setLoadingFollowing] = useState(true)
   const [selectedUid, setSelectedUid] = useState('')
   const [message, setMessage] = useState('')
   const [isSending, setIsSending] = useState(false)
@@ -26,9 +26,9 @@ export default function RecommendBookModal({ book, onClose }: Props) {
   useScrollLock()
 
   useEffect(() => {
-    getMyFriends()
-      .then(setFriends)
-      .finally(() => setLoadingFriends(false))
+    getMyFollowing()
+      .then(setFollowing)
+      .finally(() => setLoadingFollowing(false))
   }, [])
 
   const [sendError, setSendError] = useState<string | null>(null)
@@ -96,17 +96,17 @@ export default function RecommendBookModal({ book, onClose }: Props) {
               <span className="font-medium text-white">{book.title}</span>
             </p>
 
-            {loadingFriends ? (
+            {loadingFollowing ? (
               <div className="flex justify-center py-4">
                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-700 border-t-indigo-500" />
               </div>
-            ) : friends.length === 0 ? (
-              <p className="text-sm text-slate-500">Aucun ami pour l'instant.</p>
+            ) : following.length === 0 ? (
+              <p className="text-sm text-slate-500">Tu ne suis encore personne.</p>
             ) : (
               <div className="space-y-2">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Choisir un ami</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Choisir un abonnement</p>
                 <div className="space-y-1 max-h-40 overflow-y-auto">
-                  {friends.map((f) => (
+                  {following.map((f) => (
                     <button
                       key={f.uid}
                       onClick={() => setSelectedUid(f.uid)}
@@ -114,8 +114,12 @@ export default function RecommendBookModal({ book, onClose }: Props) {
                         selectedUid === f.uid ? 'bg-indigo-600/30 ring-1 ring-indigo-500/50' : 'bg-slate-700/60 hover:bg-slate-700'
                       }`}
                     >
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600/20">
-                        <span className="text-sm font-bold text-indigo-400">{f.username[0].toUpperCase()}</span>
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-600/20 overflow-hidden">
+                        {f.photoURL ? (
+                          <img src={f.photoURL} alt={f.username} className="h-full w-full object-cover" />
+                        ) : (
+                          <span className="text-sm font-bold text-indigo-400">{f.username[0].toUpperCase()}</span>
+                        )}
                       </div>
                       <span className="text-sm font-medium text-white">@{f.username}</span>
                       {selectedUid === f.uid && (

@@ -10,8 +10,16 @@ service cloud.firestore {
     match /users/{userId} {
       // Lecture publique (pages /u/:username sans auth) + tout utilisateur connecté
       allow read: if true;
-      // Seul le propriétaire peut créer/modifier son profil
-      allow create, update: if request.auth != null && request.auth.uid == userId;
+      // Seul le propriétaire peut créer son profil
+      allow create: if request.auth != null && request.auth.uid == userId;
+      // Le propriétaire peut tout modifier ; n'importe quel utilisateur connecté
+      // peut incrémenter/décrémenter uniquement followersCount (opération de suivi)
+      allow update: if request.auth != null && (
+        request.auth.uid == userId
+        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followersCount'])
+            && (request.resource.data.followersCount == resource.data.followersCount + 1
+             || request.resource.data.followersCount == resource.data.followersCount - 1))
+      );
 
       match /books/{bookId} {
         // Lecture publique (le client filtre sur status == 'read' pour les profils publics)
@@ -20,11 +28,42 @@ service cloud.firestore {
         allow write: if request.auth != null && request.auth.uid == userId;
       }
 
+      // ── Système d'abonnements (followers/following) ───────────────────────
+
+      match /following/{followedUid} {
+        // Le propriétaire lit sa liste de personnes suivies ;
+        // la personne suivie peut vérifier si elle est suivie
+        allow read: if request.auth != null &&
+          (request.auth.uid == userId || request.auth.uid == followedUid);
+        // Seul le propriétaire modifie sa propre liste following
+        allow write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      match /followers/{followerUid} {
+        // Le propriétaire lit ses abonnés ;
+        // l'abonné peut vérifier son entrée
+        allow read: if request.auth != null &&
+          (request.auth.uid == userId || request.auth.uid == followerUid);
+        // L'abonné écrit (et supprime) sa propre entrée dans la liste
+        allow write: if request.auth != null && request.auth.uid == followerUid;
+      }
+
+      match /followRequests/{requesterUid} {
+        // Le destinataire et le demandeur peuvent lire
+        allow read: if request.auth != null &&
+          (request.auth.uid == userId || request.auth.uid == requesterUid);
+        // Seul le demandeur peut créer une demande
+        allow create: if request.auth != null && request.auth.uid == requesterUid;
+        // L'un ou l'autre peut supprimer (accepter/refuser/annuler)
+        allow delete: if request.auth != null &&
+          (request.auth.uid == userId || request.auth.uid == requesterUid);
+      }
+
+      // ── Legacy : system d'amis (conservé pour la migration) ──────────────
+
       match /friends/{friendUid} {
-        // Le propriétaire et l'ami peuvent lire
         allow read: if request.auth != null &&
           (request.auth.uid == userId || request.auth.uid == friendUid);
-        // Le propriétaire ou l'ami peuvent écrire (acceptation bilatérale via batch)
         allow write: if request.auth != null &&
           (request.auth.uid == userId || request.auth.uid == friendUid);
       }
@@ -32,25 +71,22 @@ service cloud.firestore {
       match /recommendations/{recId} {
         // Seul le destinataire peut lire et supprimer
         allow read, delete: if request.auth != null && request.auth.uid == userId;
-        // N'importe quel utilisateur connecté peut envoyer (seuls les amis voient les profils dans l'app)
+        // N'importe quel utilisateur connecté peut envoyer
         allow create: if request.auth != null;
       }
 
       match /stories/{storyId} {
         // Le propriétaire peut tout faire
         allow read, write: if request.auth != null && request.auth.uid == userId;
-        // Les amis confirmés peuvent lire
+        // Les abonnés (followers) peuvent lire
         allow read: if request.auth != null &&
-          exists(/databases/$(database)/documents/users/$(userId)/friends/$(request.auth.uid));
+          exists(/databases/$(database)/documents/users/$(userId)/followers/$(request.auth.uid));
       }
 
       match /friendRequests/{fromUid} {
-        // Le destinataire et l'expéditeur peuvent lire
         allow read: if request.auth != null &&
           (request.auth.uid == userId || request.auth.uid == fromUid);
-        // Seul l'expéditeur peut créer
         allow create: if request.auth != null && request.auth.uid == fromUid;
-        // L'un ou l'autre peut supprimer (accepter/refuser/annuler)
         allow delete: if request.auth != null &&
           (request.auth.uid == userId || request.auth.uid == fromUid);
       }

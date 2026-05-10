@@ -4,11 +4,23 @@ export interface UserProfile {
   uid: string
   username: string
   photoURL: string | null
+  bio?: string | null
   createdAt: Date
   readingGoal?: { year: number; target: number } | null
   isPublic?: boolean
+  followersCount?: number
+  followingCount?: number
 }
 
+/** Un utilisateur que je suis (ou qui me suit) */
+export interface FollowEntry {
+  uid: string
+  username: string
+  photoURL?: string | null
+  followedAt: Date
+}
+
+/** Compatibilité legacy — sera retiré progressivement */
 export interface FriendEntry {
   uid: string
   username: string
@@ -20,6 +32,8 @@ export interface FriendRequest {
   username: string
   createdAt: Date
 }
+
+export type FollowStatus = 'none' | 'following' | 'pending'
 
 export const BOOK_STATUS_LABELS: Record<BookStatus, string> = {
   read: 'Lu',

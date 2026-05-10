@@ -14,9 +14,14 @@ import {
   writeBatch,
   onSnapshot,
   Timestamp,
+  increment,
 } from 'firebase/firestore'
 import { auth, db } from './firebase'
-import type { BookResult, BookStatus, UserBook, UserProfile, FriendEntry, FriendRequest, Recommendation, Story } from '../types/book'
+import type {
+  BookResult, BookStatus, UserBook, UserProfile,
+  FriendEntry, FriendRequest, Recommendation, Story,
+  FollowEntry, FollowStatus,
+} from '../types/book'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -51,6 +56,16 @@ function docToUserBook(docSnap: { id: string; data: () => Record<string, unknown
     finishedAt: toDate(d.finishedAt),
     createdAt: toDate(d.createdAt) ?? new Date(),
     updatedAt: toDate(d.updatedAt) ?? new Date(),
+  }
+}
+
+function docToFollowEntry(docSnap: { id: string; data: () => Record<string, unknown> }): FollowEntry {
+  const d = docSnap.data()
+  return {
+    uid: docSnap.id,
+    username: d.username as string,
+    photoURL: (d.photoURL as string | null) ?? null,
+    followedAt: toDate(d.followedAt) ?? new Date(),
   }
 }
 
@@ -170,7 +185,29 @@ export async function deleteBook(bookId: string): Promise<void> {
 export async function createUserProfile(username: string): Promise<void> {
   const userId = auth.currentUser?.uid
   if (!userId) throw new Error('Non authentifié')
-  await setDoc(doc(db, 'users', userId), { username, photoURL: null, isPublic: true, createdAt: serverTimestamp() })
+  await setDoc(doc(db, 'users', userId), {
+    username,
+    photoURL: null,
+    bio: null,
+    isPublic: true,
+    followersCount: 0,
+    followingCount: 0,
+    createdAt: serverTimestamp(),
+  })
+}
+
+function docToProfile(uid: string, d: Record<string, unknown>): UserProfile {
+  return {
+    uid,
+    username: d.username as string,
+    photoURL: (d.photoURL as string | null) ?? null,
+    bio: (d.bio as string | null) ?? null,
+    createdAt: toDate(d.createdAt) ?? new Date(),
+    readingGoal: (d.readingGoal as { year: number; target: number } | null) ?? null,
+    isPublic: (d.isPublic as boolean | undefined) ?? true,
+    followersCount: (d.followersCount as number | undefined) ?? 0,
+    followingCount: (d.followingCount as number | undefined) ?? 0,
+  }
 }
 
 export async function getMyProfile(): Promise<UserProfile | null> {
@@ -178,15 +215,13 @@ export async function getMyProfile(): Promise<UserProfile | null> {
   if (!userId) return null
   const snap = await getDoc(doc(db, 'users', userId))
   if (!snap.exists()) return null
-  const d = snap.data()
-  return {
-    uid: userId,
-    username: d.username as string,
-    photoURL: (d.photoURL as string | null) ?? null,
-    createdAt: toDate(d.createdAt) ?? new Date(),
-    readingGoal: (d.readingGoal as { year: number; target: number } | null) ?? null,
-    isPublic: (d.isPublic as boolean | undefined) ?? true,
-  }
+  return docToProfile(userId, snap.data() as Record<string, unknown>)
+}
+
+export async function getProfileByUid(uid: string): Promise<UserProfile | null> {
+  const snap = await getDoc(doc(db, 'users', uid))
+  if (!snap.exists()) return null
+  return docToProfile(uid, snap.data() as Record<string, unknown>)
 }
 
 export async function setProfilePublic(isPublic: boolean): Promise<void> {
@@ -207,6 +242,12 @@ export async function updateUserPhotoURL(photoURL: string): Promise<void> {
   await updateDoc(doc(db, 'users', userId), { photoURL })
 }
 
+export async function updateBio(bio: string): Promise<void> {
+  const userId = auth.currentUser?.uid
+  if (!userId) throw new Error('Non authentifié')
+  await updateDoc(doc(db, 'users', userId), { bio: bio.trim() || null })
+}
+
 export async function checkUsernameAvailable(username: string): Promise<boolean> {
   const q = query(collection(db, 'users'), where('username', '==', username))
   const snap = await getDocs(q)
@@ -218,65 +259,166 @@ export async function searchUserByUsername(username: string): Promise<UserProfil
   const snap = await getDocs(q)
   if (snap.empty) return null
   const d = snap.docs[0]
-  return {
-    uid: d.id,
-    username: d.data().username as string,
-    photoURL: (d.data().photoURL as string | null) ?? null,
-    createdAt: toDate(d.data().createdAt) ?? new Date(),
-  }
+  return docToProfile(d.id, d.data() as Record<string, unknown>)
 }
 
-// ── friend requests ───────────────────────────────────────────────────────────
+// ── follow system ─────────────────────────────────────────────────────────────
 
-export async function sendFriendRequest(toUid: string): Promise<void> {
-  const userId = auth.currentUser?.uid
-  if (!userId) throw new Error('Non authentifié')
-  const myProfile = await getMyProfile()
-  if (!myProfile) throw new Error('Profil non trouvé')
-  await setDoc(doc(db, 'users', toUid, 'friendRequests', userId), {
-    fromUsername: myProfile.username,
-    createdAt: serverTimestamp(),
-  })
-}
-
-export async function cancelFriendRequest(toUid: string): Promise<void> {
-  const userId = auth.currentUser?.uid
-  if (!userId) throw new Error('Non authentifié')
-  await deleteDoc(doc(db, 'users', toUid, 'friendRequests', userId))
-}
-
-export async function getPendingRequests(): Promise<FriendRequest[]> {
-  const userId = auth.currentUser?.uid
-  if (!userId) throw new Error('Non authentifié')
-  const snap = await getDocs(collection(db, 'users', userId, 'friendRequests'))
-  return snap.docs.map((d) => ({
-    uid: d.id,
-    username: d.data().fromUsername as string,
-    createdAt: toDate(d.data().createdAt) ?? new Date(),
-  }))
-}
-
-export async function acceptFriendRequest(fromUid: string, fromUsername: string): Promise<void> {
-  const userId = auth.currentUser?.uid
-  if (!userId) throw new Error('Non authentifié')
+export async function followUser(theirUid: string, theirUsername: string, theirPhotoURL?: string | null): Promise<void> {
+  const myUid = auth.currentUser?.uid
+  if (!myUid) throw new Error('Non authentifié')
   const myProfile = await getMyProfile()
   if (!myProfile) throw new Error('Profil non trouvé')
 
   const batch = writeBatch(db)
   const now = serverTimestamp()
-  batch.set(doc(db, 'users', userId, 'friends', fromUid), { username: fromUsername, since: now })
-  batch.set(doc(db, 'users', fromUid, 'friends', userId), { username: myProfile.username, since: now })
-  batch.delete(doc(db, 'users', userId, 'friendRequests', fromUid))
+
+  // MY following collection
+  batch.set(doc(db, 'users', myUid, 'following', theirUid), {
+    username: theirUsername,
+    photoURL: theirPhotoURL ?? null,
+    followedAt: now,
+  })
+  // THEIR followers collection
+  batch.set(doc(db, 'users', theirUid, 'followers', myUid), {
+    username: myProfile.username,
+    photoURL: myProfile.photoURL ?? null,
+    followedAt: now,
+  })
+  // Update counters
+  batch.update(doc(db, 'users', myUid), { followingCount: increment(1) })
+  batch.update(doc(db, 'users', theirUid), { followersCount: increment(1) })
+
   await batch.commit()
 }
 
-export async function rejectFriendRequest(fromUid: string): Promise<void> {
-  const userId = auth.currentUser?.uid
-  if (!userId) throw new Error('Non authentifié')
-  await deleteDoc(doc(db, 'users', userId, 'friendRequests', fromUid))
+export async function unfollowUser(theirUid: string): Promise<void> {
+  const myUid = auth.currentUser?.uid
+  if (!myUid) throw new Error('Non authentifié')
+
+  const batch = writeBatch(db)
+  batch.delete(doc(db, 'users', myUid, 'following', theirUid))
+  batch.delete(doc(db, 'users', theirUid, 'followers', myUid))
+  batch.update(doc(db, 'users', myUid), { followingCount: increment(-1) })
+  batch.update(doc(db, 'users', theirUid), { followersCount: increment(-1) })
+
+  await batch.commit()
 }
 
-// ── friends ───────────────────────────────────────────────────────────────────
+export async function sendFollowRequest(theirUid: string, theirUsername: string): Promise<void> {
+  const myUid = auth.currentUser?.uid
+  if (!myUid) throw new Error('Non authentifié')
+  const myProfile = await getMyProfile()
+  if (!myProfile) throw new Error('Profil non trouvé')
+
+  await setDoc(doc(db, 'users', theirUid, 'followRequests', myUid), {
+    username: myProfile.username,
+    photoURL: myProfile.photoURL ?? null,
+    createdAt: serverTimestamp(),
+  })
+}
+
+export async function cancelFollowRequest(theirUid: string): Promise<void> {
+  const myUid = auth.currentUser?.uid
+  if (!myUid) throw new Error('Non authentifié')
+  await deleteDoc(doc(db, 'users', theirUid, 'followRequests', myUid))
+}
+
+export async function acceptFollowRequest(fromUid: string, fromUsername: string, fromPhotoURL?: string | null): Promise<void> {
+  const myUid = auth.currentUser?.uid
+  if (!myUid) throw new Error('Non authentifié')
+  const myProfile = await getMyProfile()
+  if (!myProfile) throw new Error('Profil non trouvé')
+
+  const batch = writeBatch(db)
+  const now = serverTimestamp()
+
+  // Add to my followers
+  batch.set(doc(db, 'users', myUid, 'followers', fromUid), {
+    username: fromUsername,
+    photoURL: fromPhotoURL ?? null,
+    followedAt: now,
+  })
+  // Add to their following
+  batch.set(doc(db, 'users', fromUid, 'following', myUid), {
+    username: myProfile.username,
+    photoURL: myProfile.photoURL ?? null,
+    followedAt: now,
+  })
+  // Remove the request
+  batch.delete(doc(db, 'users', myUid, 'followRequests', fromUid))
+  // Update counters
+  batch.update(doc(db, 'users', myUid), { followersCount: increment(1) })
+  batch.update(doc(db, 'users', fromUid), { followingCount: increment(1) })
+
+  await batch.commit()
+}
+
+export async function rejectFollowRequest(fromUid: string): Promise<void> {
+  const myUid = auth.currentUser?.uid
+  if (!myUid) throw new Error('Non authentifié')
+  await deleteDoc(doc(db, 'users', myUid, 'followRequests', fromUid))
+}
+
+export async function checkFollowStatus(theirUid: string): Promise<FollowStatus> {
+  const myUid = auth.currentUser?.uid
+  if (!myUid) throw new Error('Non authentifié')
+
+  const [followingSnap, requestSnap] = await Promise.all([
+    getDoc(doc(db, 'users', myUid, 'following', theirUid)),
+    getDoc(doc(db, 'users', theirUid, 'followRequests', myUid)),
+  ])
+
+  if (followingSnap.exists()) return 'following'
+  if (requestSnap.exists()) return 'pending'
+  return 'none'
+}
+
+export async function getMyFollowing(): Promise<FollowEntry[]> {
+  const myUid = auth.currentUser?.uid
+  if (!myUid) throw new Error('Non authentifié')
+  const snap = await getDocs(collection(db, 'users', myUid, 'following'))
+  return snap.docs.map(docToFollowEntry)
+}
+
+export async function getFollowers(uid: string): Promise<FollowEntry[]> {
+  const snap = await getDocs(collection(db, 'users', uid, 'followers'))
+  return snap.docs.map(docToFollowEntry)
+}
+
+export async function getFollowing(uid: string): Promise<FollowEntry[]> {
+  const snap = await getDocs(collection(db, 'users', uid, 'following'))
+  return snap.docs.map(docToFollowEntry)
+}
+
+export function subscribeToFollowing(callback: (entries: FollowEntry[]) => void): () => void {
+  const myUid = auth.currentUser?.uid
+  if (!myUid) return () => {}
+  return onSnapshot(collection(db, 'users', myUid, 'following'), (snap) => {
+    callback(snap.docs.map(docToFollowEntry))
+  })
+}
+
+export function subscribeToFollowRequests(callback: (entries: FollowEntry[]) => void): () => void {
+  const myUid = auth.currentUser?.uid
+  if (!myUid) return () => {}
+  return onSnapshot(collection(db, 'users', myUid, 'followRequests'), (snap) => {
+    callback(snap.docs.map((d) => ({
+      uid: d.id,
+      username: d.data().username as string,
+      photoURL: (d.data().photoURL as string | null) ?? null,
+      followedAt: toDate(d.data().createdAt) ?? new Date(),
+    })))
+  })
+}
+
+export async function getFriendBooks(friendUid: string): Promise<UserBook[]> {
+  const q = query(collection(db, 'users', friendUid, 'books'), orderBy('createdAt', 'desc'))
+  const snapshot = await getDocs(q)
+  return snapshot.docs.map(docToUserBook)
+}
+
+// ── legacy friend helpers (kept for backward compat / migration) ──────────────
 
 export async function getMyFriends(): Promise<FriendEntry[]> {
   const userId = auth.currentUser?.uid
@@ -298,22 +440,51 @@ export async function removeFriend(friendUid: string): Promise<void> {
   await batch.commit()
 }
 
-export type FriendshipStatus = 'none' | 'friends' | 'pending_sent' | 'pending_received'
-
-export async function checkFriendshipStatus(otherUid: string): Promise<FriendshipStatus> {
+export async function sendFriendRequest(toUid: string): Promise<void> {
   const userId = auth.currentUser?.uid
   if (!userId) throw new Error('Non authentifié')
+  const myProfile = await getMyProfile()
+  if (!myProfile) throw new Error('Profil non trouvé')
+  await setDoc(doc(db, 'users', toUid, 'friendRequests', userId), {
+    fromUsername: myProfile.username,
+    createdAt: serverTimestamp(),
+  })
+}
 
-  const [friendSnap, sentSnap, receivedSnap] = await Promise.all([
-    getDoc(doc(db, 'users', userId, 'friends', otherUid)),
-    getDoc(doc(db, 'users', otherUid, 'friendRequests', userId)),
-    getDoc(doc(db, 'users', userId, 'friendRequests', otherUid)),
-  ])
+export async function cancelFriendRequest(toUid: string): Promise<void> {
+  const userId = auth.currentUser?.uid
+  if (!userId) throw new Error('Non authentifié')
+  await deleteDoc(doc(db, 'users', toUid, 'friendRequests', userId))
+}
 
-  if (friendSnap.exists()) return 'friends'
-  if (sentSnap.exists()) return 'pending_sent'
-  if (receivedSnap.exists()) return 'pending_received'
-  return 'none'
+export async function acceptFriendRequest(fromUid: string, fromUsername: string): Promise<void> {
+  const userId = auth.currentUser?.uid
+  if (!userId) throw new Error('Non authentifié')
+  const myProfile = await getMyProfile()
+  if (!myProfile) throw new Error('Profil non trouvé')
+  const batch = writeBatch(db)
+  const now = serverTimestamp()
+  batch.set(doc(db, 'users', userId, 'friends', fromUid), { username: fromUsername, since: now })
+  batch.set(doc(db, 'users', fromUid, 'friends', userId), { username: myProfile.username, since: now })
+  batch.delete(doc(db, 'users', userId, 'friendRequests', fromUid))
+  await batch.commit()
+}
+
+export async function rejectFriendRequest(fromUid: string): Promise<void> {
+  const userId = auth.currentUser?.uid
+  if (!userId) throw new Error('Non authentifié')
+  await deleteDoc(doc(db, 'users', userId, 'friendRequests', fromUid))
+}
+
+export async function getPendingRequests(): Promise<FriendRequest[]> {
+  const userId = auth.currentUser?.uid
+  if (!userId) throw new Error('Non authentifié')
+  const snap = await getDocs(collection(db, 'users', userId, 'friendRequests'))
+  return snap.docs.map((d) => ({
+    uid: d.id,
+    username: d.data().fromUsername as string,
+    createdAt: toDate(d.data().createdAt) ?? new Date(),
+  }))
 }
 
 export function subscribeToPendingRequests(callback: (reqs: FriendRequest[]) => void): () => void {
@@ -340,10 +511,20 @@ export function subscribeToFriends(callback: (friends: FriendEntry[]) => void): 
   })
 }
 
-export async function getFriendBooks(friendUid: string): Promise<UserBook[]> {
-  const q = query(collection(db, 'users', friendUid, 'books'), orderBy('createdAt', 'desc'))
-  const snapshot = await getDocs(q)
-  return snapshot.docs.map(docToUserBook)
+export type FriendshipStatus = 'none' | 'friends' | 'pending_sent' | 'pending_received'
+
+export async function checkFriendshipStatus(otherUid: string): Promise<FriendshipStatus> {
+  const userId = auth.currentUser?.uid
+  if (!userId) throw new Error('Non authentifié')
+  const [friendSnap, sentSnap, receivedSnap] = await Promise.all([
+    getDoc(doc(db, 'users', userId, 'friends', otherUid)),
+    getDoc(doc(db, 'users', otherUid, 'friendRequests', userId)),
+    getDoc(doc(db, 'users', userId, 'friendRequests', otherUid)),
+  ])
+  if (friendSnap.exists()) return 'friends'
+  if (sentSnap.exists()) return 'pending_sent'
+  if (receivedSnap.exists()) return 'pending_received'
+  return 'none'
 }
 
 // ── recommendations ───────────────────────────────────────────────────────────
@@ -438,7 +619,7 @@ export async function getMyStories(): Promise<Story[]> {
   }))
 }
 
-export async function getFriendsStories(friends: FriendEntry[]): Promise<Story[]> {
+export async function getFriendsStories(friends: Array<{ uid: string; username: string }>): Promise<Story[]> {
   if (friends.length === 0) return []
   const sevenDaysAgo = Timestamp.fromDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
   const results = await Promise.all(
@@ -483,13 +664,7 @@ export async function getProfileByUsername(username: string): Promise<UserProfil
   const snap = await getDocs(q)
   if (snap.empty) return null
   const d = snap.docs[0]
-  return {
-    uid: d.id,
-    username: d.data().username as string,
-    photoURL: (d.data().photoURL as string | null) ?? null,
-    createdAt: toDate(d.data().createdAt) ?? new Date(),
-    isPublic: (d.data().isPublic as boolean | undefined) ?? true,
-  }
+  return docToProfile(d.id, d.data() as Record<string, unknown>)
 }
 
 export async function getPublicBooks(uid: string): Promise<UserBook[]> {

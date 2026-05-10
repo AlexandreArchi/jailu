@@ -55,7 +55,7 @@ export default function BottomNav({ active, onChange, toReadCount, readCount, pe
     { key: 'to_read', label: 'À lire', count: toReadCount },
     { key: 'read', label: 'Lus', count: readCount },
     { key: 'search', label: 'Chercher' },
-    { key: 'friends', label: 'Amis', count: pendingFriendsCount },
+    { key: 'friends', label: 'Réseau', count: pendingFriendsCount },
   ]
 
   return (

@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getUserBooks, getFriendBooks } from '../lib/firestore'
-import type { FriendEntry, UserBook, UserProfile } from '../types/book'
+import type { FollowEntry, UserBook, UserProfile } from '../types/book'
 
 interface Props {
   myProfile: UserProfile
-  friends: FriendEntry[]
+  following: FollowEntry[]
   onClose: () => void
-  onFriendClick: (friend: FriendEntry) => void
+  onUserClick: (entry: FollowEntry) => void
 }
 
 type Metric = 'books' | 'pages' | 'hours'
@@ -46,13 +46,13 @@ function computeStats(uid: string, username: string, isMe: boolean, books: UserB
   }
 }
 
-export default function LeaderboardScreen({ myProfile, friends, onClose, onFriendClick }: Props) {
+export default function LeaderboardScreen({ myProfile, following, onClose, onUserClick }: Props) {
   const [allBooks, setAllBooks] = useState<Map<string, UserBook[]>>(new Map())
   const [isLoading, setIsLoading] = useState(true)
   const [selectedYear, setSelectedYear] = useState<number | null>(new Date().getFullYear())
   const [metric, setMetric] = useState<Metric>('books')
   const [selectedUids, setSelectedUids] = useState<Set<string>>(
-    () => new Set([myProfile.uid, ...friends.map((f) => f.uid)])
+    () => new Set([myProfile.uid, ...following.map((f) => f.uid)])
   )
 
   useEffect(() => {
@@ -63,7 +63,7 @@ export default function LeaderboardScreen({ myProfile, friends, onClose, onFrien
   useEffect(() => {
     const players = [
       { uid: myProfile.uid, fetch: getUserBooks() },
-      ...friends.map((f) => ({ uid: f.uid, fetch: getFriendBooks(f.uid) })),
+      ...following.map((f) => ({ uid: f.uid, fetch: getFriendBooks(f.uid) })),
     ]
     Promise.allSettled(players.map(async (p) => ({ uid: p.uid, books: await p.fetch })))
       .then((results) => {
@@ -74,7 +74,7 @@ export default function LeaderboardScreen({ myProfile, friends, onClose, onFrien
         setAllBooks(map)
       })
       .finally(() => setIsLoading(false))
-  }, [myProfile.uid, friends])
+  }, [myProfile.uid, following])
 
   const availableYears = useMemo(() => {
     const currentYear = new Date().getFullYear()
@@ -95,18 +95,17 @@ export default function LeaderboardScreen({ myProfile, friends, onClose, onFrien
     for (const [uid, books] of allBooks.entries()) {
       if (!selectedUids.has(uid)) continue
       const isMe = uid === myProfile.uid
-      const username = isMe ? myProfile.username : (friends.find((f) => f.uid === uid)?.username ?? uid)
+      const username = isMe ? myProfile.username : (following.find((f) => f.uid === uid)?.username ?? uid)
       players.push(computeStats(uid, username, isMe, books, selectedYear))
     }
     const key: Record<Metric, keyof PlayerStats> = { books: 'booksRead', pages: 'pagesRead', hours: 'readingTimeHours' }
     return players.sort((a, b) => {
       const diff = (b[key[metric]] as number) - (a[key[metric]] as number)
       if (diff !== 0) return diff
-      // Tiebreaker : à égalité de livres → départager par pages lues
       if (metric === 'books') return b.pagesRead - a.pagesRead
       return 0
     })
-  }, [allBooks, selectedUids, selectedYear, metric, myProfile, friends])
+  }, [allBooks, selectedUids, selectedYear, metric, myProfile, following])
 
   const maxValue = rankings[0]
     ? metric === 'books' ? rankings[0].booksRead : metric === 'pages' ? rankings[0].pagesRead : rankings[0].readingTimeHours
@@ -131,12 +130,11 @@ export default function LeaderboardScreen({ myProfile, friends, onClose, onFrien
 
   const allPlayers = [
     { uid: myProfile.uid, username: myProfile.username, isMe: true },
-    ...friends.map((f) => ({ uid: f.uid, username: f.username, isMe: false })),
+    ...following.map((f) => ({ uid: f.uid, username: f.username, isMe: false })),
   ]
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-950">
-      {/* Header */}
       <div className="flex items-center gap-3 px-4 pt-12 pb-4 sm:pt-6">
         <button
           onClick={onClose}
@@ -222,7 +220,7 @@ export default function LeaderboardScreen({ myProfile, friends, onClose, onFrien
                 const value = getValue(player)
                 const barPct = maxValue > 0 ? (value / maxValue) * 100 : 0
                 const medal = MEDALS[i]
-                const friend = friends.find((f) => f.uid === player.uid)
+                const followEntry = following.find((f) => f.uid === player.uid)
 
                 const inner = (
                   <>
@@ -259,10 +257,10 @@ export default function LeaderboardScreen({ myProfile, friends, onClose, onFrien
                   </>
                 )
 
-                return friend ? (
+                return followEntry ? (
                   <button
                     key={player.uid}
-                    onClick={() => onFriendClick(friend)}
+                    onClick={() => onUserClick(followEntry)}
                     className={`relative w-full overflow-hidden rounded-2xl px-4 py-3.5 text-left transition active:scale-[0.98] ${player.isMe ? 'ring-2 ring-indigo-500/60 bg-indigo-950/40' : 'bg-slate-800/60 ring-1 ring-white/5 hover:bg-slate-800'}`}
                   >
                     {inner}
