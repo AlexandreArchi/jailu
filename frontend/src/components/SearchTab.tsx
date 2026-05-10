@@ -55,6 +55,8 @@ export default function SearchTab({ onBookAdded }: SearchTabProps) {
       onBookAdded()
       setAddedIds((prev) => new Set([...prev, bookToAdd.google_books_id]))
       setBookToAdd(null)
+    } catch {
+      // keep modal open on error so user can retry
     } finally {
       setIsAdding(false)
     }

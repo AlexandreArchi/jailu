@@ -51,9 +51,11 @@ export default function ProfileModal({ user, profile, onClose, onPhotoUpdated }:
         await navigator.share({ title: `Bibliothèque de @${profile.username}`, url: publicUrl })
       } catch { /* dismissed */ }
     } else {
-      await navigator.clipboard.writeText(publicUrl)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      try {
+        await navigator.clipboard.writeText(publicUrl)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      } catch { /* clipboard permission denied */ }
     }
   }, [publicUrl, profile.username])
 

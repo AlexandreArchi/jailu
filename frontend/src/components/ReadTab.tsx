@@ -109,7 +109,7 @@ function GridCard({ book, onClick }: { book: UserBook; onClick: () => void }) {
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent px-1.5 pb-1.5 pt-6">
         <p className="text-[9px] font-semibold text-white leading-tight line-clamp-2">{book.title}</p>
         {book.rating !== null && (
-          <p className="text-[8px] text-amber-400 mt-0.5">{'★'.repeat(Math.floor(book.rating))}</p>
+          <p className="text-[8px] text-amber-400 mt-0.5">{'★'.repeat(Math.min(5, Math.max(0, Math.round(book.rating))))}</p>
         )}
       </div>
     </button>

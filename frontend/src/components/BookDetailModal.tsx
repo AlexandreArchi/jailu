@@ -483,7 +483,7 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
           quotes: snapQuotes,
           pageCount: snapPageCount,
           startedAt: snapBecomingReading ? new Date() : undefined,
-          finishedAt: snapStatus === 'read' ? (finishedAt ?? new Date()) : finishedAt,
+          finishedAt: snapStatus === 'read' ? (finishedAt ?? new Date()) : null,
         })
         onUpdated()
         setAutoSaveState('saved')
@@ -560,9 +560,14 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
     // Cancel any pending auto-save before deleting
     if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null }
     setIsDeleting(true)
-    await deleteBook(book.id)
-    onUpdated()
-    onClose()
+    try {
+      await deleteBook(book.id)
+      onUpdated()
+      onClose()
+    } catch {
+      setIsDeleting(false)
+      setConfirmDelete(false)
+    }
   }
 
   return (

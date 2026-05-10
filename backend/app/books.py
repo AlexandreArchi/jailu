@@ -249,10 +249,10 @@ def _build_queries(q: str) -> list[str]:
     # Dédupliquer en conservant l'ordre
     seen: set[str] = set()
     unique = []
-    for q in queries:
-        if q not in seen:
-            seen.add(q)
-            unique.append(q)
+    for query_str in queries:
+        if query_str not in seen:
+            seen.add(query_str)
+            unique.append(query_str)
     return unique[:6]  # max 6 requêtes parallèles
 
 

@@ -108,6 +108,8 @@ export default function SuggestionsSection({ books, onBookAdded }: Props) {
       setSuggestions((prev) => prev.filter((s) => s.book.google_books_id !== selected.google_books_id))
       setSelected(null)
       onBookAdded()
+    } catch {
+      // keep modal open on error so user can retry
     } finally {
       setIsAdding(false)
     }

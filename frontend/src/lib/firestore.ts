@@ -170,7 +170,7 @@ export async function deleteBook(bookId: string): Promise<void> {
 export async function createUserProfile(username: string): Promise<void> {
   const userId = auth.currentUser?.uid
   if (!userId) throw new Error('Non authentifié')
-  await setDoc(doc(db, 'users', userId), { username, photoURL: null, createdAt: serverTimestamp() })
+  await setDoc(doc(db, 'users', userId), { username, photoURL: null, isPublic: true, createdAt: serverTimestamp() })
 }
 
 export async function getMyProfile(): Promise<UserProfile | null> {

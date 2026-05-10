@@ -7,16 +7,17 @@ interface Props {
 }
 
 function StarRating({ rating }: { rating: number }) {
+  const rounded = Math.min(5, Math.max(0, Math.round(rating)))
   return (
     <div className="flex gap-0.5">
       {[1, 2, 3, 4, 5].map((n) => (
         <svg
           key={n}
           viewBox="0 0 24 24"
-          fill={n <= rating ? 'currentColor' : 'none'}
+          fill={n <= rounded ? 'currentColor' : 'none'}
           stroke="currentColor"
           strokeWidth={1.5}
-          className={`h-3 w-3 ${n <= rating ? 'text-amber-400' : 'text-slate-600'}`}
+          className={`h-3 w-3 ${n <= rounded ? 'text-amber-400' : 'text-slate-600'}`}
         >
           <path
             strokeLinecap="round"

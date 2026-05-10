@@ -54,6 +54,7 @@ function SwipeToDelete({ onDelete, children }: { onDelete: () => void; children:
         if (offset < -80) { setOffset(-400); setTimeout(onDelete, 260) }
         else setOffset(0)
       }}
+      onTouchCancel={() => { dragging.current = false; setOffset(0) }}
     >
       {children}
     </div>
@@ -97,10 +98,14 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
     return () => { unsubReqs(); unsubFriends(); unsubRecs() }
   }, [myUid])
 
+  // Stable key: only re-fetch when actual friend UIDs change, not on every snapshot ref
+  const friendsUidKey = friends.map((f) => f.uid).sort().join(',')
+
   useEffect(() => {
-    if (friends.length === 0) return
+    if (!friendsUidKey) return
     void getFriendsStories(friends).then(setFriendStories)
-  }, [friends])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [friendsUidKey])
 
   useEffect(() => {
     void getMyStories().then((s) =>
@@ -109,18 +114,21 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
   }, [myProfile.username])
 
   useEffect(() => {
-    if (friends.length === 0) { setFriendsReading([]); return }
-    const candidates = friends.slice(0, 6) // fetch up to 6, keep first 3 with a reading book
-    void Promise.all(candidates.map((f) => getFriendBooks(f.uid))).then((results) => {
+    if (!friendsUidKey) { setFriendsReading([]); return }
+    const candidates = friends.slice(0, 6)
+    void Promise.allSettled(candidates.map((f) => getFriendBooks(f.uid))).then((results) => {
       const reading: { friend: FriendEntry; book: UserBook }[] = []
       for (let i = 0; i < candidates.length; i++) {
         if (reading.length >= 3) break
-        const readingBook = results[i].find((b) => b.status === 'reading')
+        const r = results[i]
+        if (r.status !== 'fulfilled') continue
+        const readingBook = r.value.find((b) => b.status === 'reading')
         if (readingBook) reading.push({ friend: candidates[i], book: readingBook })
       }
       setFriendsReading(reading)
     })
-  }, [friends])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [friendsUidKey])
 
   useEffect(() => {
     if (selectedRec) {
@@ -136,20 +144,21 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
     const id = selectedRec.googleBooksId
     if (!id) return
     setLoadingDesc(true)
-    fetch(`https://www.googleapis.com/books/v1/volumes/${id}`)
+    const controller = new AbortController()
+    fetch(`https://www.googleapis.com/books/v1/volumes/${id}`, { signal: controller.signal })
       .then((r) => r.json())
       .then((data) => {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         const raw = (data?.volumeInfo?.description as string | undefined) ?? null
-        // Strip HTML tags
         const clean = raw ? raw.replace(/<[^>]+>/g, '').replace(/&[a-z]+;/gi, (m) => {
           const map: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" }
           return map[m] ?? m
         }) : null
         setRecDescription(clean)
       })
-      .catch(() => setRecDescription(null))
+      .catch((err: unknown) => { if ((err as { name?: string }).name !== 'AbortError') setRecDescription(null) })
       .finally(() => setLoadingDesc(false))
+    return () => controller.abort()
   }, [selectedRec])
 
   const handleSearch = async (e: React.FormEvent) => {

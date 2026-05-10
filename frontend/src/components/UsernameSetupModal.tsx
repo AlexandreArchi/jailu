@@ -30,9 +30,13 @@ export default function UsernameSetupModal({ onComplete }: Props) {
     e.preventDefault()
     if (status !== 'available') return
     setIsSaving(true)
-    await createUserProfile(value)
-    const uid = auth.currentUser?.uid ?? ''
-    onComplete({ uid, username: value, photoURL: null, createdAt: new Date() })
+    try {
+      await createUserProfile(value)
+      const uid = auth.currentUser?.uid ?? ''
+      onComplete({ uid, username: value, photoURL: null, createdAt: new Date() })
+    } catch {
+      setIsSaving(false)
+    }
   }
 
   const hint =

@@ -97,7 +97,7 @@ async def get_suggestions(body: SuggestionsRequest) -> list[SuggestionItem]:
         return []
 
     read_books_dicts = [
-        {'title': b.title, 'author': b.author, 'rating': b.rating or 3.0}
+        {'title': b.title, 'author': b.author, 'rating': b.rating if b.rating is not None else 3.0}
         for b in body.read_books
     ]
 
@@ -177,3 +177,5 @@ async def proxy_image(url: str) -> Response:
         )
     except httpx.TimeoutException:
         raise HTTPException(status_code=408, detail='Timeout')
+    except httpx.RequestError:
+        raise HTTPException(status_code=502, detail='Erreur réseau')

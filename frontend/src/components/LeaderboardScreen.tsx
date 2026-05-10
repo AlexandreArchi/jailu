@@ -65,13 +65,14 @@ export default function LeaderboardScreen({ myProfile, friends, onClose, onFrien
       { uid: myProfile.uid, fetch: getUserBooks() },
       ...friends.map((f) => ({ uid: f.uid, fetch: getFriendBooks(f.uid) })),
     ]
-    Promise.all(players.map(async (p) => ({ uid: p.uid, books: await p.fetch })))
+    Promise.allSettled(players.map(async (p) => ({ uid: p.uid, books: await p.fetch })))
       .then((results) => {
         const map = new Map<string, UserBook[]>()
-        for (const r of results) map.set(r.uid, r.books)
+        for (const r of results) {
+          if (r.status === 'fulfilled') map.set(r.value.uid, r.value.books)
+        }
         setAllBooks(map)
       })
-      .catch(() => {})
       .finally(() => setIsLoading(false))
   }, [myProfile.uid, friends])
 
