@@ -76,7 +76,7 @@ export default function BookCard(props: BookCardProps) {
           </p>
           {props.variant === 'library' && props.book.rating !== null && (
             <p className="mt-0.5 text-xs text-amber-400">
-              {'★'.repeat(props.book.rating)}{'☆'.repeat(5 - props.book.rating)}
+              {'★'.repeat(Math.min(5, Math.max(0, Math.round(props.book.rating))))}{'☆'.repeat(5 - Math.min(5, Math.max(0, Math.round(props.book.rating))))}
             </p>
           )}
         </div>

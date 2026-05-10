@@ -1,17 +1,17 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
+from typing import Annotated, AsyncIterator
 from urllib.parse import urlparse
 
 import httpx
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .books import BookResult, search_books
-from .groq_client import generate_suggestion_reason, get_book_recommendations
+from .groq_client import get_book_recommendations
 from .config import settings
 from .logging_config import configure_logging
 
@@ -76,8 +76,8 @@ class ReadBook(BaseModel):
 
 
 class SuggestionsRequest(BaseModel):
-    read_books: list[ReadBook]
-    owned_titles: list[str] = []
+    read_books: Annotated[list[ReadBook], Field(max_length=50)]
+    owned_titles: Annotated[list[str], Field(max_length=500)] = []
 
 
 class SuggestionItem(BaseModel):
@@ -141,35 +141,6 @@ async def get_suggestions(body: SuggestionsRequest) -> list[SuggestionItem]:
     return suggestions[:5]
 
 
-# ── Suggestion reason (legacy) ───────────────────────────────────────────────────
-
-class SuggestionReasonRequest(BaseModel):
-    source_title: str
-    source_author: str
-    suggested_title: str
-    suggested_author: str
-    suggested_description: str | None = None
-
-
-class SuggestionReasonResponse(BaseModel):
-    reason: str | None
-
-
-@app.post('/api/suggestions/reason', response_model=SuggestionReasonResponse)
-async def suggestion_reason(body: SuggestionReasonRequest) -> SuggestionReasonResponse:
-    if not settings.groq_api_key:
-        raise HTTPException(status_code=503, detail='Groq non configuré')
-    reason = await generate_suggestion_reason(
-        body.source_title,
-        body.source_author,
-        body.suggested_title,
-        body.suggested_author,
-        body.suggested_description,
-        settings.groq_api_key,
-    )
-    return SuggestionReasonResponse(reason=reason)
-
-
 # ── Image proxy ──────────────────────────────────────────────────────────────────
 
 _PROXY_ALLOWED_HOSTS = {
@@ -184,11 +155,14 @@ _PROXY_ALLOWED_HOSTS = {
 async def proxy_image(url: str) -> Response:
     """Proxy externe → même origine pour le canvas HTML (contourne CORS tiers)."""
     try:
-        host = urlparse(url).hostname or ''
+        parsed = urlparse(url)
+        host = parsed.hostname or ''
+        scheme = parsed.scheme
     except Exception:
         host = ''
-    if host not in _PROXY_ALLOWED_HOSTS:
-        raise HTTPException(status_code=400, detail='Hôte non autorisé')
+        scheme = ''
+    if scheme not in ('http', 'https') or host not in _PROXY_ALLOWED_HOSTS:
+        raise HTTPException(status_code=400, detail='URL non autorisée')
 
     try:
         async with httpx.AsyncClient(follow_redirects=True, timeout=10) as client:

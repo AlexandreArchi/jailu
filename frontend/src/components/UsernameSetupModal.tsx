@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { checkUsernameAvailable, createUserProfile } from '../lib/firestore'
+import { auth } from '../lib/firebase'
 import type { UserProfile } from '../types/book'
 
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/
@@ -30,7 +31,8 @@ export default function UsernameSetupModal({ onComplete }: Props) {
     if (status !== 'available') return
     setIsSaving(true)
     await createUserProfile(value)
-    onComplete({ uid: '', username: value, photoURL: null, createdAt: new Date() })
+    const uid = auth.currentUser?.uid ?? ''
+    onComplete({ uid, username: value, photoURL: null, createdAt: new Date() })
   }
 
   const hint =

@@ -458,6 +458,7 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
     if (isFirstRender.current) { isFirstRender.current = false; return }
 
     const becomingRead = status === 'read' && prevStatusRef.current !== 'read'
+    const becomingReading = status === 'reading' && prevStatusRef.current !== 'reading'
     prevStatusRef.current = status
 
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
@@ -469,6 +470,7 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
     const snapFinishedAtInput = finishedAtInput
     const snapQuotes = [...quotes]
     const snapBecomingRead = becomingRead
+    const snapBecomingReading = becomingReading
 
     saveTimerRef.current = setTimeout(async () => {
       setAutoSaveState('saving')
@@ -480,6 +482,7 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
           notes: snapNotes.trim() || null,
           quotes: snapQuotes,
           pageCount: snapPageCount,
+          startedAt: snapBecomingReading ? new Date() : undefined,
           finishedAt: snapStatus === 'read' ? (finishedAt ?? new Date()) : finishedAt,
         })
         onUpdated()

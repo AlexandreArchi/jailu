@@ -157,34 +157,46 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
     const q = searchQuery.trim().replace(/^@/, '').toLowerCase()
     if (!q) return
     setSearchState({ kind: 'loading' })
-    const profile = await searchUserByUsername(q)
-    if (!profile) { setSearchState({ kind: 'not_found' }); return }
-    if (profile.uid === myUid) { setSearchState({ kind: 'self' }); return }
-    const status = await checkFriendshipStatus(profile.uid)
-    setSearchState({ kind: 'found', profile, status })
+    try {
+      const profile = await searchUserByUsername(q)
+      if (!profile) { setSearchState({ kind: 'not_found' }); return }
+      if (profile.uid === myUid) { setSearchState({ kind: 'self' }); return }
+      const status = await checkFriendshipStatus(profile.uid)
+      setSearchState({ kind: 'found', profile, status })
+    } catch {
+      setSearchState({ kind: 'idle' })
+    }
   }
 
   const handleSendRequest = async (toUid: string) => {
-    await sendFriendRequest(toUid)
-    setSearchState((prev) =>
-      prev.kind === 'found' ? { ...prev, status: 'pending_sent' } : prev,
-    )
+    try {
+      await sendFriendRequest(toUid)
+      setSearchState((prev) =>
+        prev.kind === 'found' ? { ...prev, status: 'pending_sent' } : prev,
+      )
+    } catch { /* silently ignore */ }
   }
 
   const handleCancelRequest = async (toUid: string) => {
-    await cancelFriendRequest(toUid)
-    setSearchState((prev) =>
-      prev.kind === 'found' ? { ...prev, status: 'none' } : prev,
-    )
+    try {
+      await cancelFriendRequest(toUid)
+      setSearchState((prev) =>
+        prev.kind === 'found' ? { ...prev, status: 'none' } : prev,
+      )
+    } catch { /* silently ignore */ }
   }
 
   const handleAccept = async (req: FriendRequest) => {
-    await acceptFriendRequest(req.uid, req.username)
-    setSearchState({ kind: 'idle' })
+    try {
+      await acceptFriendRequest(req.uid, req.username)
+      setSearchState({ kind: 'idle' })
+    } catch { /* silently ignore */ }
   }
 
   const handleReject = async (fromUid: string) => {
-    await rejectFriendRequest(fromUid)
+    try {
+      await rejectFriendRequest(fromUid)
+    } catch { /* silently ignore */ }
   }
 
   const openStories = (_uid: string, stories: Story[], isMe: boolean) => {

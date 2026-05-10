@@ -32,7 +32,7 @@ function CoverItem({ book, onClick }: { book: UserBook; onClick: () => void }) {
         <p className="truncate text-xs text-slate-500 mt-0.5">{book.authors.join(', ')}</p>
         {book.rating !== null && (
           <p className="mt-0.5 text-xs text-amber-400">
-            {'★'.repeat(book.rating)}{'☆'.repeat(5 - book.rating)}
+            {'★'.repeat(Math.min(5, Math.max(0, Math.round(book.rating))))}{'☆'.repeat(5 - Math.min(5, Math.max(0, Math.round(book.rating))))}
           </p>
         )}
       </div>

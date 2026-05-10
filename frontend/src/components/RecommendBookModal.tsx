@@ -18,25 +18,33 @@ export default function RecommendBookModal({ book, onClose }: Props) {
     void getMyFriends().then(setFriends)
   }, [])
 
+  const [sendError, setSendError] = useState<string | null>(null)
+
   const handleSend = async () => {
     if (!selectedUid) return
     setIsSending(true)
-    const myProfile = await getMyProfile()
-    await sendRecommendation(
-      selectedUid,
-      {
-        title: book.title,
-        authors: book.authors,
-        coverUrl: book.coverUrl,
-        thumbnailUrl: book.thumbnailUrl,
-        googleBooksId: book.googleBooksId,
-      },
-      message.trim() || null,
-      myProfile?.username ?? '',
-    )
-    setIsSending(false)
-    setSent(true)
-    setTimeout(onClose, 1200)
+    setSendError(null)
+    try {
+      const myProfile = await getMyProfile()
+      await sendRecommendation(
+        selectedUid,
+        {
+          title: book.title,
+          authors: book.authors,
+          coverUrl: book.coverUrl,
+          thumbnailUrl: book.thumbnailUrl,
+          googleBooksId: book.googleBooksId,
+        },
+        message.trim() || null,
+        myProfile?.username ?? '',
+      )
+      setSent(true)
+      setTimeout(onClose, 1200)
+    } catch {
+      setSendError('Erreur lors de l\'envoi. Réessaie.')
+    } finally {
+      setIsSending(false)
+    }
   }
 
   return (
@@ -115,6 +123,9 @@ export default function RecommendBookModal({ book, onClose }: Props) {
               />
             </div>
 
+            {sendError && (
+              <p className="text-xs text-red-400 text-center">{sendError}</p>
+            )}
             <button
               onClick={() => void handleSend()}
               disabled={!selectedUid || isSending}
