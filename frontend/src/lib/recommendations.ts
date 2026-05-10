@@ -1,5 +1,6 @@
 import type { BookResult, UserBook } from '../types/book'
 import { getSuggestions } from './api'
+import { auth } from './firebase'
 
 export interface Suggestion {
   book: BookResult
@@ -13,7 +14,8 @@ let _cache: { key: string; suggestions: Suggestion[]; at: number } | null = null
 const CACHE_TTL_MS = 60 * 60 * 1000 // 1 h
 
 function buildCacheKey(library: UserBook[]): string {
-  return library.map((b) => b.id).sort().join(',')
+  const uid = auth.currentUser?.uid ?? ''
+  return `${uid}:${library.map((b) => b.id).sort().join(',')}`
 }
 
 /**

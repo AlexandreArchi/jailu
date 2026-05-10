@@ -67,7 +67,7 @@ export default function SearchBar({ onSearch, isLoading }: SearchBarProps) {
       {/* Input */}
       <div className="relative">
         <input
-          type="search"
+          type="text"
           placeholder={currentMode.placeholder}
           value={value}
           onChange={(e) => setValue(e.target.value)}

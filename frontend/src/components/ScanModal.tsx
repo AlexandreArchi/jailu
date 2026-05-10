@@ -95,6 +95,11 @@ export default function ScanModal({ onScan, onClose }: ScanModalProps) {
   }
 
   useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [])
+
+  useEffect(() => {
     let stopped = false
     let animFrame: number
 

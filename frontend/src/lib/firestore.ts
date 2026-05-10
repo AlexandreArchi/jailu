@@ -127,7 +127,7 @@ export async function updateBookCover(bookId: string, coverUrl: string): Promise
   const userId = auth.currentUser?.uid
   if (!userId) throw new Error('Non authentifié')
   const bookRef = doc(db, 'users', userId, 'books', bookId)
-  await updateDoc(bookRef, { coverUrl, updatedAt: serverTimestamp() })
+  await updateDoc(bookRef, { coverUrl, thumbnailUrl: null, updatedAt: serverTimestamp() })
 }
 
 export async function getUserBooks(): Promise<UserBook[]> {
@@ -402,7 +402,7 @@ export async function createStory(
   rating: number | null,
 ): Promise<void> {
   const userId = auth.currentUser?.uid
-  if (!userId) return
+  if (!userId) throw new Error('Non authentifié')
   await addDoc(collection(db, 'users', userId, 'stories'), {
     bookTitle: book.title,
     bookAuthors: book.authors,

@@ -435,6 +435,7 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [showFullDesc, setShowFullDesc] = useState(false)
   const [isUploadingCover, setIsUploadingCover] = useState(false)
+  const [coverUploadError, setCoverUploadError] = useState<string | null>(null)
   const [showRecommend, setShowRecommend] = useState(false)
   const [showStoryPrompt, setShowStoryPrompt] = useState(false)
   const [quotes, setQuotes] = useState<string[]>(book.quotes ?? [])
@@ -507,6 +508,9 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
   const handleCoverUpload = async (file: File) => {
     const userId = auth.currentUser?.uid
     if (!userId) return
+    if (!file.type.startsWith('image/')) { setCoverUploadError('Fichier invalide — choisis une image.'); return }
+    if (file.size > 5 * 1024 * 1024) { setCoverUploadError('Image trop lourde (max 5 Mo).'); return }
+    setCoverUploadError(null)
     setIsUploadingCover(true)
     try {
       const storageRef = ref(storage, `bookCovers/${userId}/${Date.now()}`)
@@ -514,6 +518,8 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
       const url = await getDownloadURL(storageRef)
       await updateBookCover(book.id, url)
       setCoverSrc(url)
+    } catch {
+      setCoverUploadError('Erreur lors de l\'upload. Réessaie.')
     } finally {
       setIsUploadingCover(false)
     }
@@ -607,7 +613,7 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
                   void createStory(
                     { title: book.title, authors: book.authors, coverUrl: book.coverUrl, thumbnailUrl: book.thumbnailUrl, googleBooksId: book.googleBooksId },
                     rating,
-                  )
+                  ).catch(() => { /* ignore — story creation best-effort */ })
                   onClose()
                 }}
                 className="w-full rounded-2xl bg-indigo-600 py-3.5 font-semibold text-white shadow-lg shadow-indigo-900/40 transition hover:bg-indigo-500 active:scale-[0.98]"
@@ -709,6 +715,9 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleCoverUpload(f) }}
               />
             </div>
+            {coverUploadError && (
+              <p className="mt-1 text-center text-[10px] text-red-400">{coverUploadError}</p>
+            )}
 
             {/* Text info */}
             <div className="min-w-0 flex-1 pb-1">
@@ -791,7 +800,7 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
           </div>
 
           {/* Journal de lecture */}
-          {(status === 'reading' || status === 'read' || finishedAtInput) && (
+          {(status === 'read' || finishedAtInput) && (
             <div className="rounded-2xl bg-slate-800/40 px-4 py-4 ring-1 ring-white/5">
               <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Terminé en</p>
               {readOnly ? (

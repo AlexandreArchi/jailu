@@ -20,8 +20,12 @@ export default function UsernameSetupModal({ onComplete }: Props) {
 
     setStatus('checking')
     const t = setTimeout(async () => {
-      const available = await checkUsernameAvailable(value)
-      setStatus(available ? 'available' : 'taken')
+      try {
+        const available = await checkUsernameAvailable(value)
+        setStatus(available ? 'available' : 'taken')
+      } catch {
+        setStatus('idle') // allow retry on network error
+      }
     }, 600)
     return () => clearTimeout(t)
   }, [value])

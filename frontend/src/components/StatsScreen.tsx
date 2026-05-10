@@ -21,7 +21,7 @@ function TopCover({ book, onClick }: { book: UserBook; onClick: () => void }) {
   const fallback = toHttps(book.thumbnailUrl ? book.coverUrl : '')
   return (
     <button onClick={onClick} className="shrink-0">
-      <div className="h-28 w-19 overflow-hidden rounded-xl bg-slate-700 shadow-lg">
+      <div className="h-28 w-[76px] overflow-hidden rounded-xl bg-slate-700 shadow-lg">
         {src ? (
           <img src={src} alt={book.title} className="h-full w-full object-cover"
             onError={() => { if (src !== fallback && fallback) setSrc(fallback); else setSrc('') }} />
@@ -158,7 +158,7 @@ export default function StatsScreen({ books, onClose, onBookClick }: StatsScreen
           {top5.length > 0 && (
             <section>
               <h2 className="mb-3 text-sm font-semibold text-white">
-                Vos {top5.length === 1 ? 'livre préféré' : `${top5.length} livres préférés`}
+                Tes {top5.length === 1 ? 'livre préféré' : `${top5.length} livres préférés`}
               </h2>
               <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
                 {top5.map((book) => (

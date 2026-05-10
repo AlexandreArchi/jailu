@@ -103,14 +103,14 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
 
   useEffect(() => {
     if (!friendsUidKey) return
-    void getFriendsStories(friends).then(setFriendStories)
+    void getFriendsStories(friends).then(setFriendStories).catch(() => setFriendStories([]))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [friendsUidKey])
 
   useEffect(() => {
-    void getMyStories().then((s) =>
-      setMyStories(s.map((story) => ({ ...story, fromUsername: myProfile.username })))
-    )
+    void getMyStories()
+      .then((s) => setMyStories(s.map((story) => ({ ...story, fromUsername: myProfile.username }))))
+      .catch(() => setMyStories([]))
   }, [myProfile.username])
 
   useEffect(() => {
