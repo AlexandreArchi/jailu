@@ -1,12 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { readBarcodesFromImageData, prepareZXingModule } from 'zxing-wasm/reader'
-
-// Charge le WASM depuis notre propre hébergement (pas le CDN jsDelivr)
-prepareZXingModule({
-  overrides: {
-    locateFile: (path: string) => path.endsWith('.wasm') ? '/zxing_reader.wasm' : path,
-  },
-})
+import { Html5Qrcode } from 'html5-qrcode'
 
 // Native BarcodeDetector API (Chrome/Android)
 type NativeDetector = {
@@ -28,6 +21,7 @@ const isIOS = typeof BarcodeDetector === 'undefined'
 export default function ScanModal({ onScan, onClose }: ScanModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const detectedRef = useRef(false)
   const [error, setError] = useState<string | null>(null)
   const [detected, setDetected] = useState(false)
@@ -47,50 +41,31 @@ export default function ScanModal({ onScan, onClose }: ScanModalProps) {
     onScan(isbn)
   }
 
-  /** Décode une frame ou une image statique via zxing-wasm (C++, bien meilleur qu'@zxing/browser) */
-  const decodeImageData = async (imageData: ImageData): Promise<string | null> => {
-    const results = await readBarcodesFromImageData(imageData, {
-      formats: ['EAN-13', 'EAN-8'],
-      tryHarder: true,
-    })
-    for (const r of results) {
-      if (r.isValid) return r.text
-    }
-    return null
-  }
+  /** iOS : l'utilisateur appuie sur le shutter → ouvre l'appareil photo natif */
+  const handleScanButton = () => fileInputRef.current?.click()
 
-  /** Capture manuelle haute résolution → zxing-wasm */
-  const captureAndDecode = async () => {
-    const video = videoRef.current
-    if (!video || detectedRef.current) return
+  /** iOS : décode l'image capturée via html5-qrcode */
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || detectedRef.current) return
     setCapturing(true)
     setError(null)
-    log('capture…')
-
-    const canvas = document.createElement('canvas')
-    canvas.width = video.videoWidth || 1280
-    canvas.height = video.videoHeight || 720
-    const ctx = canvas.getContext('2d')
-    if (!ctx) { setCapturing(false); return }
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-
+    log('décodage…')
     try {
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-      const text = await decodeImageData(imageData)
-      if (text && isISBN(text)) {
-        found(text)
-      } else if (text) {
-        log(`non-ISBN: ${text}`)
-        setError(`Code non reconnu (${text}). Réessayez.`)
+      const scanner = new Html5Qrcode('__html5qrcode_div__')
+      const result = await scanner.scanFile(file, false)
+      if (isISBN(result)) {
+        found(result)
       } else {
-        setError('Aucun code-barres détecté. Rapprochez-vous.')
-        log('rien détecté')
+        log(`non-ISBN: ${result}`)
+        setError(`Code non reconnu (${result}). Réessayez.`)
       }
-    } catch (e) {
-      setError('Erreur décodage. Réessayez.')
-      log(`erreur: ${e instanceof Error ? e.message : String(e)}`)
+    } catch {
+      setError('Aucun code-barres détecté. Réessayez.')
+      log('rien détecté')
     } finally {
       setCapturing(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
 
@@ -121,7 +96,7 @@ export default function ScanModal({ onScan, onClose }: ScanModalProps) {
 
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (typeof BarcodeDetector !== 'undefined') {
-          // ── Android : BarcodeDetector natif ──
+          // ── Android : BarcodeDetector natif (scan temps réel) ──
           log('Android — BarcodeDetector')
           const detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'code_128'] })
           const tick = async () => {
@@ -136,44 +111,11 @@ export default function ScanModal({ onScan, onClose }: ScanModalProps) {
           }
           animFrame = requestAnimationFrame(tick)
         } else {
-          // ── iOS : zxing-wasm (C++) en boucle rAF ──
-          log('chargement WASM…')
-          await prepareZXingModule({ fireImmediately: true })
-          if (stopped) return
-          log('iOS — scan actif')
-
-          const canvas = document.createElement('canvas')
-          let decoding = false
-
-          // Proposer le shutter au bout de 4 s si rien détecté
-          setTimeout(() => { if (!detectedRef.current && !stopped) setShowShutter(true) }, 4000)
-
-          const tick = async () => {
-            if (stopped || detectedRef.current || !videoRef.current) return
-            const video = videoRef.current
-            if (!decoding && video.readyState >= 2 && video.videoWidth > 0) {
-              decoding = true
-              canvas.width = video.videoWidth
-              canvas.height = video.videoHeight
-              const ctx = canvas.getContext('2d')
-              if (ctx) {
-                ctx.drawImage(video, 0, 0)
-                try {
-                  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-                  const text = await decodeImageData(imageData)
-                  if (text) {
-                    log(`lu: ${text}`)
-                    if (isISBN(text)) { found(text); return }
-                  }
-                } catch (e) {
-                  log(`err wasm: ${e instanceof Error ? e.message : String(e)}`)
-                }
-              }
-              decoding = false
-            }
-            animFrame = requestAnimationFrame(tick)
-          }
-          animFrame = requestAnimationFrame(tick)
+          // ── iOS : photo native via html5-qrcode ──
+          // Le flux caméra sert de viseur. L'utilisateur appuie sur le shutter
+          // pour déclencher l'appareil photo natif iOS → html5-qrcode décode.
+          log('iOS — prêt')
+          setShowShutter(true)
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
@@ -203,6 +145,19 @@ export default function ScanModal({ onScan, onClose }: ScanModalProps) {
         autoPlay
         muted
         playsInline
+      />
+
+      {/* Conteneur masqué requis par html5-qrcode */}
+      <div id="__html5qrcode_div__" style={{ display: 'none' }} />
+
+      {/* Input fichier — ouvre l'appareil photo natif sur iOS */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => void handleFileChange(e)}
       />
 
       {/* Overlay zones sombres */}
@@ -250,7 +205,7 @@ export default function ScanModal({ onScan, onClose }: ScanModalProps) {
             <p className="text-sm text-red-400">{error}</p>
             {isIOS && (
               <button
-                onClick={() => { setError(null); void captureAndDecode() }}
+                onClick={() => { setError(null); handleScanButton() }}
                 className="h-16 w-16 rounded-full bg-white ring-4 ring-white/30 transition active:scale-90"
                 aria-label="Réessayer"
               />
@@ -263,7 +218,7 @@ export default function ScanModal({ onScan, onClose }: ScanModalProps) {
             </p>
             {isIOS && showShutter && (
               <button
-                onClick={() => void captureAndDecode()}
+                onClick={handleScanButton}
                 className="h-16 w-16 rounded-full bg-white ring-4 ring-white/30 transition active:scale-90"
                 aria-label="Capturer"
               />
