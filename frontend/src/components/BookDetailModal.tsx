@@ -431,7 +431,6 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
   const [notes, setNotes] = useState(book.notes ?? '')
   const [pageCount, setPageCount] = useState<number | null>(book.pageCount)
   const [finishedAtInput, setFinishedAtInput] = useState(toMonthInput(book.finishedAt))
-  const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [showFullDesc, setShowFullDesc] = useState(false)
@@ -441,6 +440,60 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
   const [quotes, setQuotes] = useState<string[]>(book.quotes ?? [])
   const [newQuote, setNewQuote] = useState('')
   const coverFileRef = useRef<HTMLInputElement>(null)
+
+  // ── Auto-save ────────────────────────────────────────────────────────────────
+  const [autoSaveState, setAutoSaveState] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const isFirstRender = useRef(true)
+  const prevStatusRef = useRef(book.status)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const quotesKey = JSON.stringify(quotes)
+
+  // Lock body scroll while modal is open
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [])
+
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return }
+
+    const becomingRead = status === 'read' && prevStatusRef.current !== 'read'
+    prevStatusRef.current = status
+
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+
+    const snapStatus = status
+    const snapRating = rating
+    const snapNotes = notes
+    const snapPageCount = pageCount
+    const snapFinishedAtInput = finishedAtInput
+    const snapQuotes = [...quotes]
+    const snapBecomingRead = becomingRead
+
+    saveTimerRef.current = setTimeout(async () => {
+      setAutoSaveState('saving')
+      try {
+        const finishedAt = fromMonthInput(snapFinishedAtInput)
+        await updateBook(book.id, {
+          status: snapStatus,
+          rating: snapRating,
+          notes: snapNotes.trim() || null,
+          quotes: snapQuotes,
+          pageCount: snapPageCount,
+          finishedAt: snapStatus === 'read' ? (finishedAt ?? new Date()) : finishedAt,
+        })
+        onUpdated()
+        setAutoSaveState('saved')
+        if (snapBecomingRead) setShowStoryPrompt(true)
+        setTimeout(() => setAutoSaveState('idle'), 1500)
+      } catch {
+        setAutoSaveState('idle')
+      }
+    }, 500)
+
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, rating, notes, pageCount, finishedAtInput, quotesKey])
 
   const year = book.publishedDate?.split('-')[0]
   const toHttps = (url: string) => url.replace('http://', 'https://')
@@ -463,21 +516,6 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
     }
   }
 
-  const handleSave = async () => {
-    setIsSaving(true)
-    const becomingRead = status === 'read' && book.status !== 'read'
-    const finishedAt = fromMonthInput(finishedAtInput)
-    const extra: { finishedAt?: Date | null } = { finishedAt }
-    if (!finishedAt && status === 'read') extra.finishedAt = new Date()
-    await updateBook(book.id, { status, rating, notes: notes.trim() || null, quotes, pageCount, ...extra })
-    setIsSaving(false)
-    onUpdated()
-    if (becomingRead) {
-      setShowStoryPrompt(true)
-    } else {
-      onClose()
-    }
-  }
 
   const [isGeneratingCard, setIsGeneratingCard] = useState(false)
 
@@ -516,6 +554,8 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
 
   const handleDelete = async () => {
     if (!confirmDelete) { setConfirmDelete(true); return }
+    // Cancel any pending auto-save before deleting
+    if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null }
     setIsDeleting(true)
     await deleteBook(book.id)
     onUpdated()
@@ -827,11 +867,11 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
                       {!readOnly && (
                         <button
                           onClick={() => setQuotes(quotes.filter((_, idx) => idx !== i))}
-                          className="mt-0.5 shrink-0 text-slate-600 transition hover:text-red-400"
-                          aria-label="Supprimer"
+                          className="mt-0.5 shrink-0 text-slate-600 transition hover:text-rose-400 active:text-rose-500"
+                          aria-label="Supprimer la citation"
                         >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-3.5 w-3.5">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
                           </svg>
                         </button>
                       )}
@@ -874,13 +914,24 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
           {/* Actions */}
           {!readOnly && (
             <div className="space-y-2.5 pt-1">
-              <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="w-full rounded-2xl bg-indigo-600 py-3.5 font-semibold text-white shadow-lg shadow-indigo-900/40 transition hover:bg-indigo-500 active:scale-[0.98] disabled:opacity-50"
-              >
-                {isSaving ? 'Enregistrement…' : 'Enregistrer'}
-              </button>
+              {/* Auto-save indicator */}
+              {autoSaveState !== 'idle' && (
+                <div className="flex items-center justify-center gap-1.5 py-0.5 text-xs">
+                  {autoSaveState === 'saving' ? (
+                    <>
+                      <div className="h-3 w-3 animate-spin rounded-full border border-slate-600 border-t-indigo-400" />
+                      <span className="text-slate-500">Enregistrement…</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-3 w-3 text-emerald-400">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                      </svg>
+                      <span className="text-emerald-400/80">Sauvegardé</span>
+                    </>
+                  )}
+                </div>
+              )}
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowRecommend(true)}
@@ -907,15 +958,22 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
                 </button>
               </div>
               <button
-                onClick={handleDelete}
+                onClick={() => void handleDelete()}
                 disabled={isDeleting}
-                className={`w-full rounded-2xl py-3 text-sm font-medium transition active:scale-[0.98] ${
+                className={`flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-sm font-medium transition active:scale-[0.98] ${
                   confirmDelete
-                    ? 'bg-rose-600/20 text-rose-400 ring-1 ring-rose-500/30 hover:bg-rose-600/30'
-                    : 'text-slate-600 hover:text-slate-400'
+                    ? 'bg-rose-600 text-white shadow-lg shadow-rose-900/40 hover:bg-rose-500'
+                    : 'bg-slate-800/60 text-rose-400/70 ring-1 ring-rose-500/10 hover:bg-slate-800 hover:text-rose-400'
                 }`}
               >
-                {isDeleting ? 'Suppression…' : confirmDelete ? '⚠ Confirmer la suppression' : 'Supprimer ce livre'}
+                {isDeleting ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4 shrink-0">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                  </svg>
+                )}
+                {isDeleting ? 'Suppression…' : confirmDelete ? 'Confirmer la suppression' : 'Supprimer ce livre'}
               </button>
             </div>
           )}

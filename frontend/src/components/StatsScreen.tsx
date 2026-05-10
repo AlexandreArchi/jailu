@@ -72,7 +72,11 @@ export default function StatsScreen({ books, onClose, onBookClick }: StatsScreen
 
   const ratingCounts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
   for (const b of filtered) {
-    if (b.rating !== null) ratingCounts[b.rating] = (ratingCounts[b.rating] ?? 0) + 1
+    if (b.rating !== null) {
+      // Bucket half-stars into nearest integer (3.5 → 4, 0.5 → 1, etc.)
+      const bucket = Math.min(5, Math.max(1, Math.round(b.rating)))
+      ratingCounts[bucket] = (ratingCounts[bucket] ?? 0) + 1
+    }
   }
   const maxRatingCount = Math.max(...Object.values(ratingCounts), 1)
 
