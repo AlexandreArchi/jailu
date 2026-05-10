@@ -171,7 +171,7 @@ export default function ScanModal({ onScan, onClose }: ScanModalProps) {
           <span className="absolute top-0 right-0 h-7 w-7 border-t-2 border-r-2 border-indigo-400 rounded-tr-lg" />
           <span className="absolute bottom-0 left-0 h-7 w-7 border-b-2 border-l-2 border-indigo-400 rounded-bl-lg" />
           <span className="absolute bottom-0 right-0 h-7 w-7 border-b-2 border-r-2 border-indigo-400 rounded-br-lg" />
-          {!detected && !error && !capturing && (
+          {!detected && !error && !capturing && !showShutter && (
             <div className="absolute inset-x-0 top-0 h-0.5 bg-indigo-400/80 animate-scan" />
           )}
         </div>

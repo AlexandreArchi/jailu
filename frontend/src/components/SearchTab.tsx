@@ -63,7 +63,7 @@ export default function SearchTab({ onBookAdded }: SearchTabProps) {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col pb-24">
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="px-4 pt-4 pb-3 sm:px-6">
         <div className="mb-3 flex items-center justify-between">
           <h1 className="text-lg font-bold text-white">Rechercher un livre</h1>
@@ -93,7 +93,7 @@ export default function SearchTab({ onBookAdded }: SearchTabProps) {
         {searchError && <p className="mt-2 text-sm text-red-400">{searchError}</p>}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 sm:px-6">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 pb-24">
         {query ? (
           <SearchResults results={results} onAdd={setBookToAdd} addedIds={addedIds} />
         ) : (

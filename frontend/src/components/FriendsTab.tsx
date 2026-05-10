@@ -275,7 +275,7 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col pb-24">
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       {activeStories && (
         <StoryModal
           stories={activeStories.stories}
@@ -561,7 +561,7 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-4 sm:px-6 space-y-6">
+      <div className="px-4 sm:px-6 space-y-6 pb-24">
         {isLoading ? (
           <div className="flex justify-center py-12">
             <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-700 border-t-indigo-500" />

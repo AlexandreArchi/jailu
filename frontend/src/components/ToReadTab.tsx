@@ -84,7 +84,7 @@ export default function ToReadTab({ books, onBookClick }: ToReadTabProps) {
   const total = books.filter((b) => b.status === 'to_read' || b.status === 'reading').length
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col pb-24">
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="px-4 pt-4 pb-3 sm:px-6">
         <h1 className="text-lg font-bold text-white">
           {total} livre{total > 1 ? 's' : ''} à lire
@@ -110,7 +110,7 @@ export default function ToReadTab({ books, onBookClick }: ToReadTabProps) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-4">
+      <div className="flex-1 overflow-y-auto pb-24">
         {filtered.length === 0 ? (
           <p className="py-12 text-center text-sm text-slate-600">Aucun résultat</p>
         ) : (

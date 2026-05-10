@@ -181,7 +181,7 @@ export default function ReadTab({ books, onBookClick, onShowStats }: ReadTabProp
   const currentSortOption = SORT_OPTIONS.find((o) => o.key === sort)!
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col pb-24">
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="px-4 pt-4 pb-3 sm:px-6">
         <div className="flex items-center justify-between gap-2">
           <h1 className="text-lg font-bold text-white">
@@ -269,7 +269,7 @@ export default function ReadTab({ books, onBookClick, onShowStats }: ReadTabProp
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-4">
+      <div className="flex-1 overflow-y-auto pb-24">
         {grouped.length === 0 || (grouped.length === 1 && grouped[0].items.length === 0) ? (
           <p className="py-12 text-center text-sm text-slate-600">
             {total === 0 ? "Aucun livre lu pour l'instant." : 'Aucun résultat'}
