@@ -473,29 +473,32 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
     const snapBecomingRead = becomingRead
     const snapBecomingReading = becomingReading
 
-    saveTimerRef.current = setTimeout(async () => {
-      setAutoSaveState('saving')
-      try {
-        const finishedAt = fromMonthInput(snapFinishedAtInput)
-        await updateBook(book.id, {
-          status: snapStatus,
-          rating: snapRating,
-          notes: snapNotes.trim() || null,
-          quotes: snapQuotes,
-          pageCount: snapPageCount,
-          startedAt: snapBecomingReading ? new Date() : undefined,
-          finishedAt: snapStatus === 'read' ? (finishedAt ?? new Date()) : null,
-        })
-        onUpdated()
-        setAutoSaveState('saved')
-        if (snapBecomingRead) setShowStoryPrompt(true)
-        setTimeout(() => setAutoSaveState('idle'), 1500)
-      } catch {
-        setAutoSaveState('idle')
-      }
+    saveTimerRef.current = setTimeout(() => {
+      void (async () => {
+        setAutoSaveState('saving')
+        try {
+          const finishedAt = fromMonthInput(snapFinishedAtInput)
+          await updateBook(book.id, {
+            status: snapStatus,
+            rating: snapRating,
+            notes: snapNotes.trim() || null,
+            quotes: snapQuotes,
+            pageCount: snapPageCount,
+            startedAt: snapBecomingReading ? new Date() : undefined,
+            finishedAt: snapStatus === 'read' ? (finishedAt ?? new Date()) : null,
+          })
+          onUpdated()
+          setAutoSaveState('saved')
+          if (snapBecomingRead) setShowStoryPrompt(true)
+          setTimeout(() => setAutoSaveState('idle'), 1500)
+        } catch {
+          setAutoSaveState('idle')
+        }
+      })()
     }, 500)
 
-    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current) }
+    // NE PAS annuler le timer au démontage — on veut que la sauvegarde se déclenche
+    // même si l'utilisateur ferme la modale avant 500 ms.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, rating, notes, pageCount, finishedAtInput, quotesKey])
 
