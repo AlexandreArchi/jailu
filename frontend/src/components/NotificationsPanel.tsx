@@ -34,13 +34,13 @@ export default function NotificationsPanel({ notifications, onClose }: Props) {
     setLoadingUids((prev) => new Set([...prev, notif.fromUid]))
     try {
       await followUser(notif.fromUid, notif.fromUsername, notif.fromPhotoURL)
-      setFollowedBack((prev) => new Set([...prev, notif.fromUid]))
     } catch {
       // silently ignore (e.g. already following)
-      setFollowedBack((prev) => new Set([...prev, notif.fromUid]))
     } finally {
       setLoadingUids((prev) => { const s = new Set(prev); s.delete(notif.fromUid); return s })
     }
+    // Supprimer la notification une fois traitée
+    await handleDelete(notif.id)
   }
 
   const handleDelete = async (id: string) => {
@@ -54,8 +54,8 @@ export default function NotificationsPanel({ notifications, onClose }: Props) {
         className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
       />
-      {/* Panel — slides down from top right */}
-      <div className="fixed right-4 top-[72px] z-50 w-full max-w-sm sm:right-6 animate-slide-down">
+      {/* Panel — slides down, aligné sur le header */}
+      <div className="fixed left-4 right-4 top-[72px] z-50 mx-auto max-w-lg animate-slide-down">
         <div className="rounded-2xl bg-slate-900 shadow-2xl shadow-black/60 ring-1 ring-white/10 overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
