@@ -18,8 +18,6 @@ function timeAgo(date: Date): string {
 }
 
 export default function NotificationsPanel({ notifications, onClose }: Props) {
-  // Track which UIDs we've followed back in this session
-  const [followedBack, setFollowedBack] = useState<Set<string>>(new Set())
   const [loadingUids, setLoadingUids] = useState<Set<string>>(new Set())
 
   // Mark all unread as read when panel opens
@@ -105,19 +103,13 @@ export default function NotificationsPanel({ notifications, onClose }: Props) {
 
                   {/* Actions */}
                   <div className="flex items-center gap-2 shrink-0">
-                    {followedBack.has(notif.fromUid) ? (
-                      <span className="rounded-lg bg-slate-700 px-2.5 py-1 text-xs font-medium text-slate-400">
-                        Suivi ✓
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => void handleFollowBack(notif)}
-                        disabled={loadingUids.has(notif.fromUid)}
-                        className="rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-500 transition disabled:opacity-50"
-                      >
-                        {loadingUids.has(notif.fromUid) ? '…' : 'Suivre'}
-                      </button>
-                    )}
+                    <button
+                      onClick={() => void handleFollowBack(notif)}
+                      disabled={loadingUids.has(notif.fromUid)}
+                      className="rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-500 transition disabled:opacity-50"
+                    >
+                      {loadingUids.has(notif.fromUid) ? '…' : 'Suivre'}
+                    </button>
                     <button
                       onClick={() => void handleDelete(notif.id)}
                       className="text-slate-600 hover:text-slate-400 transition p-0.5"
