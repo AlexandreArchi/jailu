@@ -71,6 +71,16 @@ export interface Story {
   createdAt: Date
 }
 
+export interface AppNotification {
+  id: string
+  type: 'new_follower'
+  fromUid: string
+  fromUsername: string
+  fromPhotoURL: string | null
+  createdAt: Date
+  read: boolean
+}
+
 export interface Recommendation {
   id: string
   bookTitle: string

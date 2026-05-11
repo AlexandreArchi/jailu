@@ -68,6 +68,13 @@ service cloud.firestore {
           (request.auth.uid == userId || request.auth.uid == friendUid);
       }
 
+      match /notifications/{notifId} {
+        // Le destinataire lit, met à jour (mark as read) et supprime
+        allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+        // N'importe quel utilisateur connecté peut créer (lors d'un follow)
+        allow create: if request.auth != null;
+      }
+
       match /recommendations/{recId} {
         // Seul le destinataire peut lire et supprimer
         allow read, delete: if request.auth != null && request.auth.uid == userId;

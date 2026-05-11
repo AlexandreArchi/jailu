@@ -18,7 +18,7 @@ import {
 } from 'firebase/firestore'
 import { auth, db } from './firebase'
 import type {
-  BookResult, BookStatus, UserBook, UserProfile,
+  AppNotification, BookResult, BookStatus, UserBook, UserProfile,
   FriendEntry, FriendRequest, Recommendation, Story,
   FollowEntry, FollowStatus,
 } from '../types/book'
@@ -289,6 +289,17 @@ export async function followUser(theirUid: string, theirUsername: string, theirP
   batch.update(doc(db, 'users', myUid), { followingCount: increment(1) })
   batch.update(doc(db, 'users', theirUid), { followersCount: increment(1) })
 
+  // Notification to the followed user
+  const notifRef = doc(collection(db, 'users', theirUid, 'notifications'))
+  batch.set(notifRef, {
+    type: 'new_follower',
+    fromUid: myUid,
+    fromUsername: myProfile.username,
+    fromPhotoURL: myProfile.photoURL ?? null,
+    createdAt: now,
+    read: false,
+  })
+
   await batch.commit()
 }
 
@@ -410,6 +421,49 @@ export function subscribeToFollowRequests(callback: (entries: FollowEntry[]) => 
       followedAt: toDate(d.data().createdAt) ?? new Date(),
     })))
   })
+}
+
+// ── notifications ─────────────────────────────────────────────────────────────
+
+function docToNotification(d: { id: string; data: () => Record<string, unknown> }): AppNotification {
+  const data = d.data()
+  return {
+    id: d.id,
+    type: data.type as 'new_follower',
+    fromUid: data.fromUid as string,
+    fromUsername: data.fromUsername as string,
+    fromPhotoURL: (data.fromPhotoURL as string | null) ?? null,
+    createdAt: toDate(data.createdAt) ?? new Date(),
+    read: (data.read as boolean | undefined) ?? false,
+  }
+}
+
+export function subscribeToNotifications(callback: (notifs: AppNotification[]) => void): () => void {
+  const userId = auth.currentUser?.uid
+  if (!userId) return () => {}
+  const q = query(
+    collection(db, 'users', userId, 'notifications'),
+    orderBy('createdAt', 'desc'),
+  )
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(docToNotification))
+  })
+}
+
+export async function markNotificationsRead(ids: string[]): Promise<void> {
+  const userId = auth.currentUser?.uid
+  if (!userId || ids.length === 0) return
+  const batch = writeBatch(db)
+  for (const id of ids) {
+    batch.update(doc(db, 'users', userId, 'notifications', id), { read: true })
+  }
+  await batch.commit()
+}
+
+export async function deleteNotification(id: string): Promise<void> {
+  const userId = auth.currentUser?.uid
+  if (!userId) return
+  await deleteDoc(doc(db, 'users', userId, 'notifications', id))
 }
 
 export async function getFriendBooks(friendUid: string): Promise<UserBook[]> {
