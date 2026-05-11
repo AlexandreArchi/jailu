@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { User } from 'firebase/auth'
-import { getUserBooks, getMyProfile, subscribeToNotifications } from '../lib/firestore'
+import { getUserBooks, getMyProfile, subscribeToNotifications, subscribeToFollowing } from '../lib/firestore'
 import BottomNav from '../components/BottomNav'
 import HomeTab from '../components/HomeTab'
 import ToReadTab from '../components/ToReadTab'
@@ -12,7 +12,7 @@ import StatsScreen from '../components/StatsScreen'
 import UsernameSetupModal from '../components/UsernameSetupModal'
 import ProfileModal from '../components/ProfileModal'
 import NotificationsPanel from '../components/NotificationsPanel'
-import type { AppNotification, UserBook, UserProfile } from '../types/book'
+import type { AppNotification, FollowEntry, UserBook, UserProfile } from '../types/book'
 
 type Tab = 'home' | 'to_read' | 'read' | 'search' | 'friends'
 
@@ -31,8 +31,10 @@ export default function LibraryPage({ user }: LibraryPageProps) {
   const [showProfile, setShowProfile] = useState(false)
   const [notifications, setNotifications] = useState<AppNotification[]>([])
   const [showNotifications, setShowNotifications] = useState(false)
+  const [myFollowing, setMyFollowing] = useState<FollowEntry[]>([])
 
   const unreadCount = notifications.filter((n) => !n.read).length
+  const myFollowingUids = useMemo(() => new Set(myFollowing.map((f) => f.uid)), [myFollowing])
 
   useEffect(() => {
     getMyProfile().then(setMyProfile).catch(() => setMyProfile(null))
@@ -40,6 +42,11 @@ export default function LibraryPage({ user }: LibraryPageProps) {
 
   useEffect(() => {
     const unsub = subscribeToNotifications(setNotifications)
+    return unsub
+  }, [user.uid])
+
+  useEffect(() => {
+    const unsub = subscribeToFollowing(setMyFollowing)
     return unsub
   }, [user.uid])
 
@@ -200,6 +207,7 @@ export default function LibraryPage({ user }: LibraryPageProps) {
       {showNotifications && (
         <NotificationsPanel
           notifications={notifications}
+          myFollowingUids={myFollowingUids}
           onClose={() => setShowNotifications(false)}
         />
       )}

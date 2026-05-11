@@ -5,6 +5,7 @@ import type { AppNotification } from '../types/book'
 
 interface Props {
   notifications: AppNotification[]
+  myFollowingUids: Set<string>
   onClose: () => void
 }
 
@@ -17,7 +18,7 @@ function timeAgo(date: Date): string {
   return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 }
 
-export default function NotificationsPanel({ notifications, onClose }: Props) {
+export default function NotificationsPanel({ notifications, myFollowingUids, onClose }: Props) {
   const [loadingUids, setLoadingUids] = useState<Set<string>>(new Set())
 
   // Mark all unread as read when panel opens
@@ -103,22 +104,38 @@ export default function NotificationsPanel({ notifications, onClose }: Props) {
 
                   {/* Actions */}
                   <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => void handleFollowBack(notif)}
-                      disabled={loadingUids.has(notif.fromUid)}
-                      className="rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-500 transition disabled:opacity-50"
-                    >
-                      {loadingUids.has(notif.fromUid) ? '…' : 'Suivre'}
-                    </button>
-                    <button
-                      onClick={() => void handleDelete(notif.id)}
-                      className="text-slate-600 hover:text-slate-400 transition p-0.5"
-                      aria-label="Supprimer"
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-3.5 w-3.5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
+                    {myFollowingUids.has(notif.fromUid) ? (
+                      /* Déjà abonné en retour — juste une croix pour fermer */
+                      <button
+                        onClick={() => void handleDelete(notif.id)}
+                        className="text-slate-600 hover:text-slate-400 transition p-0.5"
+                        aria-label="Supprimer"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-3.5 w-3.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    ) : (
+                      /* Pas encore abonné — bouton Suivre + croix */
+                      <>
+                        <button
+                          onClick={() => void handleFollowBack(notif)}
+                          disabled={loadingUids.has(notif.fromUid)}
+                          className="rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-500 transition disabled:opacity-50"
+                        >
+                          {loadingUids.has(notif.fromUid) ? '…' : 'Suivre'}
+                        </button>
+                        <button
+                          onClick={() => void handleDelete(notif.id)}
+                          className="text-slate-600 hover:text-slate-400 transition p-0.5"
+                          aria-label="Supprimer"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-3.5 w-3.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               ))

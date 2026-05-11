@@ -70,15 +70,23 @@ export default function StatsScreen({ books, onClose, onBookClick }: StatsScreen
     .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
     .slice(0, 5)
 
-  const ratingCounts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+  const STAR_BUCKETS = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5]
+  const ratingCounts: Record<number, number> = Object.fromEntries(STAR_BUCKETS.map((v) => [v, 0]))
   for (const b of filtered) {
     if (b.rating !== null) {
-      // Bucket half-stars into nearest integer (3.5 → 4, 0.5 → 1, etc.)
-      const bucket = Math.min(5, Math.max(1, Math.round(b.rating)))
+      // Round to nearest 0.5, clamp to [0.5, 5]
+      const bucket = Math.min(5, Math.max(0.5, Math.round(b.rating * 2) / 2))
       ratingCounts[bucket] = (ratingCounts[bucket] ?? 0) + 1
     }
   }
   const maxRatingCount = Math.max(...Object.values(ratingCounts), 1)
+
+  function starLabel(v: number): string {
+    const full = Math.floor(v)
+    const half = v % 1 !== 0
+    if (full === 0) return '½'
+    return half ? `${full}½` : `${full}`
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-950">
@@ -175,22 +183,23 @@ export default function StatsScreen({ books, onClose, onBookClick }: StatsScreen
                 Répartition des notes
               </h2>
               <div className="rounded-2xl bg-slate-800/60 p-4">
-                <div className="flex items-end gap-2" style={{ height: '96px' }}>
-                  {[1, 2, 3, 4, 5].map((star) => {
+                <div className="flex items-end gap-1" style={{ height: '96px' }}>
+                  {STAR_BUCKETS.map((star) => {
                     const count = ratingCounts[star] ?? 0
                     const barH = maxRatingCount > 0
                       ? Math.round((count / maxRatingCount) * 72)
                       : 0
+                    const isHalf = star % 1 !== 0
                     return (
                       <div key={star} className="flex flex-1 flex-col items-center justify-end gap-1">
                         {count > 0 && (
-                          <span className="text-[10px] font-semibold text-slate-300">{count}</span>
+                          <span className="text-[9px] font-semibold text-slate-300">{count}</span>
                         )}
                         <div
-                          className="w-full rounded-t-md bg-indigo-500"
+                          className={`w-full rounded-t-md ${isHalf ? 'bg-indigo-400/60' : 'bg-indigo-500'}`}
                           style={{ height: `${Math.max(barH, 3)}px` }}
                         />
-                        <span className="text-[10px] text-slate-500">{star}★</span>
+                        <span className="text-[9px] text-slate-500">{starLabel(star)}</span>
                       </div>
                     )
                   })}
