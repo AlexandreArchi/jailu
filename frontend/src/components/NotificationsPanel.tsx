@@ -28,7 +28,7 @@ export default function NotificationsPanel({ notifications, onClose }: Props) {
   }, [])
 
   const handleFollowBack = async (notif: AppNotification) => {
-    if (followedBack.has(notif.fromUid) || loadingUids.has(notif.fromUid)) return
+    if (loadingUids.has(notif.fromUid)) return
     setLoadingUids((prev) => new Set([...prev, notif.fromUid]))
     try {
       await followUser(notif.fromUid, notif.fromUsername, notif.fromPhotoURL)
