@@ -289,18 +289,22 @@ export async function followUser(theirUid: string, theirUsername: string, theirP
   batch.update(doc(db, 'users', myUid), { followingCount: increment(1) })
   batch.update(doc(db, 'users', theirUid), { followersCount: increment(1) })
 
-  // Notification to the followed user
-  const notifRef = doc(collection(db, 'users', theirUid, 'notifications'))
-  batch.set(notifRef, {
-    type: 'new_follower',
-    fromUid: myUid,
-    fromUsername: myProfile.username,
-    fromPhotoURL: myProfile.photoURL ?? null,
-    createdAt: now,
-    read: false,
-  })
-
+  // Follow is atomic — commit before writing the notification
   await batch.commit()
+
+  // Notification écrite séparément : son échec ne bloque pas le follow
+  try {
+    await addDoc(collection(db, 'users', theirUid, 'notifications'), {
+      type: 'new_follower',
+      fromUid: myUid,
+      fromUsername: myProfile.username,
+      fromPhotoURL: myProfile.photoURL ?? null,
+      createdAt: serverTimestamp(),
+      read: false,
+    })
+  } catch (err) {
+    console.warn('[followUser] notification write failed (non-blocking):', err)
+  }
 }
 
 export async function unfollowUser(theirUid: string): Promise<void> {
