@@ -491,7 +491,8 @@ export default function BookDetailModal({ book, onClose, onUpdated, readOnly = f
           setAutoSaveState('saved')
           if (snapBecomingRead) setShowStoryPrompt(true)
           setTimeout(() => setAutoSaveState('idle'), 1500)
-        } catch {
+        } catch (err) {
+          console.error('[AutoSave] échec de la sauvegarde :', err)
           setAutoSaveState('idle')
         }
       })()

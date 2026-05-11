@@ -24,4 +24,5 @@ export const googleProvider = new GoogleAuthProvider()
 const singleTabSettings: PersistentSingleTabManagerSettings = {}
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({ tabManager: persistentSingleTabManager(singleTabSettings) }),
+  ignoreUndefinedProperties: true,
 })
