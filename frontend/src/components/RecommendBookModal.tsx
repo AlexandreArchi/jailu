@@ -47,6 +47,7 @@ export default function RecommendBookModal({ book, onClose }: Props) {
           coverUrl: book.coverUrl,
           thumbnailUrl: book.thumbnailUrl,
           googleBooksId: book.googleBooksId,
+          description: book.description,
         },
         message.trim() || null,
         myProfile?.username ?? '',

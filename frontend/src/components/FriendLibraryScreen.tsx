@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getFriendBooks, getProfileByUid } from '../lib/firestore'
 import type { FollowEntry, UserBook, UserProfile } from '../types/book'
 import BookDetailModal from './BookDetailModal'
+import MiniRating from './MiniRating'
 import { coverPalette } from '../lib/coverColor'
 
 interface Props {
@@ -31,9 +32,9 @@ function CoverItem({ book, onClick }: { book: UserBook; onClick: () => void }) {
         <p className="truncate text-sm font-semibold text-white">{book.title}</p>
         <p className="truncate text-xs text-slate-500 mt-0.5">{book.authors.join(', ')}</p>
         {book.rating !== null && (
-          <p className="mt-0.5 text-xs text-amber-400">
-            {'★'.repeat(Math.min(5, Math.max(0, Math.round(book.rating))))}{'☆'.repeat(5 - Math.min(5, Math.max(0, Math.round(book.rating))))}
-          </p>
+          <div className="mt-0.5">
+            <MiniRating rating={book.rating} />
+          </div>
         )}
       </div>
     </button>

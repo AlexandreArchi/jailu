@@ -216,7 +216,7 @@ export default function LeaderboardScreen({ myProfile, following, onClose, onUse
             <p className="py-12 text-center text-sm text-slate-500">Aucune donnée pour cette période.</p>
           ) : (
             <div className="space-y-3 pt-1">
-              {rankings.map((player, i) => {
+              {rankings.slice(0, 15).map((player, i) => {
                 const value = getValue(player)
                 const barPct = maxValue > 0 ? (value / maxValue) * 100 : 0
                 const medal = MEDALS[i]

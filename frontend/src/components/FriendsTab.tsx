@@ -116,6 +116,14 @@ export default function FriendsTab({ myUid, myProfile, onPendingCountChange }: P
 
   useEffect(() => {
     if (!selectedRec) { setRecDescription(null); setShowRecFullDesc(false); return }
+
+    // Description stockée à l'envoi — pas besoin d'appel API
+    if (selectedRec.description !== undefined) {
+      setRecDescription(selectedRec.description)
+      return
+    }
+
+    // Fallback : ancienne recommandation sans description stockée → fetch Google Books
     const id = selectedRec.googleBooksId
     if (!id) return
     setLoadingDesc(true)

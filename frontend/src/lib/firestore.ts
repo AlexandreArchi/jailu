@@ -589,7 +589,7 @@ export async function checkFriendshipStatus(otherUid: string): Promise<Friendshi
 
 export async function sendRecommendation(
   toUid: string,
-  book: { title: string; authors: string[]; coverUrl: string; thumbnailUrl: string | null; googleBooksId: string | null },
+  book: { title: string; authors: string[]; coverUrl: string; thumbnailUrl: string | null; googleBooksId: string | null; description?: string | null },
   message: string | null,
   fromUsername: string,
 ): Promise<void> {
@@ -601,6 +601,7 @@ export async function sendRecommendation(
     bookCoverUrl: book.coverUrl,
     bookThumbnailUrl: book.thumbnailUrl ?? null,
     googleBooksId: book.googleBooksId ?? null,
+    description: book.description ?? null,
     fromUid: userId,
     fromUsername,
     message: message ?? null,
@@ -620,6 +621,7 @@ export function subscribeToRecommendations(callback: (recs: Recommendation[]) =>
       bookCoverUrl: d.data().bookCoverUrl as string,
       bookThumbnailUrl: (d.data().bookThumbnailUrl as string | null) ?? null,
       googleBooksId: (d.data().googleBooksId as string | null) ?? null,
+      description: (d.data().description as string | null) ?? null,
       fromUid: d.data().fromUid as string,
       fromUsername: d.data().fromUsername as string,
       message: (d.data().message as string | null) ?? null,

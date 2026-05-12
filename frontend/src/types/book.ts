@@ -88,6 +88,7 @@ export interface Recommendation {
   bookCoverUrl: string
   bookThumbnailUrl: string | null
   googleBooksId: string | null
+  description: string | null
   fromUid: string
   fromUsername: string
   message: string | null
