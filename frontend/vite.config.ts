@@ -35,13 +35,10 @@ export default defineConfig({
         ],
       },
       workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/firestore\.googleapis\.com\//,
-            handler: 'NetworkFirst',
-            options: { cacheName: 'firestore-cache', networkTimeoutSeconds: 10 },
-          },
           {
             urlPattern: /^https:\/\/books\.google\.com\//,
             handler: 'CacheFirst',

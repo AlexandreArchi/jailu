@@ -47,16 +47,20 @@ export default function SearchTab({ onBookAdded }: SearchTabProps) {
     [runSearch],
   )
 
+  const [addError, setAddError] = useState<string | null>(null)
+
   const handleConfirmAdd = async (status: BookStatus, finishedAt?: Date) => {
     if (!bookToAdd) return
     setIsAdding(true)
+    setAddError(null)
     try {
       await addBook(bookToAdd, status, finishedAt)
       onBookAdded()
       setAddedIds((prev) => new Set([...prev, bookToAdd.google_books_id]))
       setBookToAdd(null)
-    } catch {
-      // keep modal open on error so user can retry
+    } catch (err) {
+      console.error('[addBook] échec:', err)
+      setAddError('Impossible d\'ajouter le livre. Réessaie.')
     } finally {
       setIsAdding(false)
     }
@@ -119,7 +123,8 @@ export default function SearchTab({ onBookAdded }: SearchTabProps) {
         <AddBookModal
           book={bookToAdd}
           onConfirm={isAdding ? () => undefined : handleConfirmAdd}
-          onClose={() => setBookToAdd(null)}
+          onClose={() => { setBookToAdd(null); setAddError(null) }}
+          error={addError}
         />,
         document.body
       )}

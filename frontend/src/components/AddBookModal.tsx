@@ -6,6 +6,7 @@ interface AddBookModalProps {
   book: BookResult
   onConfirm: (status: BookStatus, finishedAt?: Date) => void
   onClose: () => void
+  error?: string | null
 }
 
 const MONTHS_FR = [
@@ -58,7 +59,7 @@ const STATUSES: { key: BookStatus; label: string; active: string }[] = [
   { key: 'to_read', label: 'À lire',   active: 'bg-slate-600 shadow-black/20' },
 ]
 
-export default function AddBookModal({ book, onConfirm, onClose }: AddBookModalProps) {
+export default function AddBookModal({ book, onConfirm, onClose, error }: AddBookModalProps) {
   const [status, setStatus] = useState<BookStatus | null>(null)
   const [finishedAtInput, setFinishedAtInput] = useState(toMonthInput(new Date()))
   const [showFullDesc, setShowFullDesc] = useState(false)
@@ -211,6 +212,7 @@ export default function AddBookModal({ book, onConfirm, onClose }: AddBookModalP
 
         {/* ── Confirm — always pinned at bottom, never scrolls away ── */}
         <div className="shrink-0 px-5 pb-8 pt-3">
+          {error && <p className="mb-3 text-center text-sm text-red-400">{error}</p>}
           <button
             onClick={handleConfirm}
             disabled={!status}
