@@ -16,6 +16,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 env:
   NODE_VERSION: '24'
@@ -54,6 +55,13 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL_PROD }}
         run: npm run build
+
+      - name: Authentification GCP via WIF
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
 
       - name: Installer Firebase CLI
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
