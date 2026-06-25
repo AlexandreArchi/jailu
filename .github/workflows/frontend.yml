@@ -66,6 +66,10 @@ jobs:
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: npm install -g firebase-tools
 
-      - name: Déploiement Firebase Hosting + Firestore rules
+      - name: Déploiement Firebase Hosting
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        run: firebase deploy --only hosting,firestore:rules --project ${{ secrets.GCP_PROJECT_ID }}
+        run: firebase deploy --only hosting --project ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Déploiement Firestore rules
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: firebase deploy --only firestore:rules --project ${{ secrets.GCP_PROJECT_ID }}
