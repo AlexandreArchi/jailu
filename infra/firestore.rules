@@ -14,8 +14,6 @@ service cloud.firestore {
       allow create: if request.auth != null && request.auth.uid == userId;
       // Le propriétaire peut tout modifier ; n'importe quel utilisateur connecté
       // peut modifier uniquement followersCount (opération de suivi/désuivi).
-      // Note : pas de validation arithmétique pour éviter les erreurs sur les
-      // anciens comptes qui n'ont pas encore le champ initialisé.
       allow update: if request.auth != null && (
         request.auth.uid == userId
         || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followersCount'])
@@ -31,30 +29,21 @@ service cloud.firestore {
       // ── Système d'abonnements (followers/following) ───────────────────────
 
       match /following/{followedUid} {
-        // Le propriétaire lit sa liste de personnes suivies ;
-        // la personne suivie peut vérifier si elle est suivie
         allow read: if request.auth != null &&
           (request.auth.uid == userId || request.auth.uid == followedUid);
-        // Seul le propriétaire modifie sa propre liste following
         allow write: if request.auth != null && request.auth.uid == userId;
       }
 
       match /followers/{followerUid} {
-        // Le propriétaire lit ses abonnés ;
-        // l'abonné peut vérifier son entrée
         allow read: if request.auth != null &&
           (request.auth.uid == userId || request.auth.uid == followerUid);
-        // L'abonné écrit (et supprime) sa propre entrée dans la liste
         allow write: if request.auth != null && request.auth.uid == followerUid;
       }
 
       match /followRequests/{requesterUid} {
-        // Le destinataire et le demandeur peuvent lire
         allow read: if request.auth != null &&
           (request.auth.uid == userId || request.auth.uid == requesterUid);
-        // Seul le demandeur peut créer une demande
         allow create: if request.auth != null && request.auth.uid == requesterUid;
-        // L'un ou l'autre peut supprimer (accepter/refuser/annuler)
         allow delete: if request.auth != null &&
           (request.auth.uid == userId || request.auth.uid == requesterUid);
       }
@@ -71,15 +60,30 @@ service cloud.firestore {
       match /notifications/{notifId} {
         // Le destinataire lit, met à jour (mark as read) et supprime
         allow read, update, delete: if request.auth != null && request.auth.uid == userId;
-        // N'importe quel utilisateur connecté peut créer (lors d'un follow)
-        allow create: if request.auth != null;
+        // Un utilisateur connecté peut créer une notif, mais avec validation :
+        // - champs obligatoires présents
+        // - type limité aux valeurs connues
+        // - fromUid doit correspondre à l'auteur de la requête
+        allow create: if request.auth != null
+          && request.resource.data.keys().hasAll(['type', 'fromUid', 'fromUsername', 'createdAt', 'read'])
+          && request.resource.data.type in ['new_follower']
+          && request.resource.data.fromUid == request.auth.uid
+          && request.resource.data.read == false
+          && request.resource.data.fromUsername is string
+          && request.resource.data.fromUsername.size() <= 30;
       }
 
       match /recommendations/{recId} {
         // Seul le destinataire peut lire et supprimer
         allow read, delete: if request.auth != null && request.auth.uid == userId;
-        // N'importe quel utilisateur connecté peut envoyer
-        allow create: if request.auth != null;
+        // Un utilisateur connecté peut envoyer, avec validation des champs
+        allow create: if request.auth != null
+          && request.resource.data.keys().hasAll(['bookTitle', 'bookAuthors', 'bookCoverUrl', 'fromUid', 'fromUsername', 'createdAt'])
+          && request.resource.data.fromUid == request.auth.uid
+          && request.resource.data.bookTitle is string
+          && request.resource.data.bookTitle.size() <= 300
+          && request.resource.data.fromUsername is string
+          && request.resource.data.fromUsername.size() <= 30;
       }
 
       match /stories/{storyId} {

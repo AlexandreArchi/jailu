@@ -11,6 +11,7 @@ import {
   query,
   orderBy,
   where,
+  limit,
   writeBatch,
   onSnapshot,
   Timestamp,
@@ -149,7 +150,7 @@ export async function getUserBooks(): Promise<UserBook[]> {
   const userId = auth.currentUser?.uid
   if (!userId) throw new Error('Non authentifié')
 
-  const q = query(collection(db, 'users', userId, 'books'), orderBy('createdAt', 'desc'))
+  const q = query(collection(db, 'users', userId, 'books'), orderBy('createdAt', 'desc'), limit(2000))
   const snapshot = await getDocs(q)
   return snapshot.docs.map(docToUserBook)
 }
@@ -409,7 +410,8 @@ export async function getFollowing(uid: string): Promise<FollowEntry[]> {
 export function subscribeToFollowing(callback: (entries: FollowEntry[]) => void): () => void {
   const myUid = auth.currentUser?.uid
   if (!myUid) return () => {}
-  return onSnapshot(collection(db, 'users', myUid, 'following'), (snap) => {
+  const q = query(collection(db, 'users', myUid, 'following'), orderBy('followedAt', 'desc'), limit(500))
+  return onSnapshot(q, (snap) => {
     callback(snap.docs.map(docToFollowEntry))
   })
 }
@@ -448,6 +450,7 @@ export function subscribeToNotifications(callback: (notifs: AppNotification[]) =
   const q = query(
     collection(db, 'users', userId, 'notifications'),
     orderBy('createdAt', 'desc'),
+    limit(50),
   )
   return onSnapshot(q, (snap) => {
     callback(snap.docs.map(docToNotification))
@@ -471,7 +474,7 @@ export async function deleteNotification(id: string): Promise<void> {
 }
 
 export async function getFriendBooks(friendUid: string): Promise<UserBook[]> {
-  const q = query(collection(db, 'users', friendUid, 'books'), orderBy('createdAt', 'desc'))
+  const q = query(collection(db, 'users', friendUid, 'books'), orderBy('createdAt', 'desc'), limit(500))
   const snapshot = await getDocs(q)
   return snapshot.docs.map(docToUserBook)
 }
@@ -612,7 +615,7 @@ export async function sendRecommendation(
 export function subscribeToRecommendations(callback: (recs: Recommendation[]) => void): () => void {
   const userId = auth.currentUser?.uid
   if (!userId) return () => {}
-  const q = query(collection(db, 'users', userId, 'recommendations'), orderBy('createdAt', 'desc'))
+  const q = query(collection(db, 'users', userId, 'recommendations'), orderBy('createdAt', 'desc'), limit(50))
   return onSnapshot(q, (snap) => {
     callback(snap.docs.map((d) => ({
       id: d.id,
@@ -689,6 +692,7 @@ export async function getFriendsStories(friends: Array<{ uid: string; username: 
           collection(db, 'users', uid, 'stories'),
           where('createdAt', '>=', sevenDaysAgo),
           orderBy('createdAt', 'desc'),
+          limit(10),
         )
         const snap = await getDocs(q)
         return snap.docs.map((d) => ({
@@ -728,7 +732,7 @@ export async function getProfileByUsername(username: string): Promise<UserProfil
 }
 
 export async function getPublicBooks(uid: string): Promise<UserBook[]> {
-  const q = query(collection(db, 'users', uid, 'books'), orderBy('createdAt', 'desc'))
+  const q = query(collection(db, 'users', uid, 'books'), orderBy('createdAt', 'desc'), limit(500))
   const snapshot = await getDocs(q)
   return snapshot.docs.map(docToUserBook)
 }
