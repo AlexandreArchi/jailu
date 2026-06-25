@@ -1,4 +1,4 @@
-rules_version = '2'; // v2
+rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -8,25 +8,17 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      // Lecture publique (pages /u/:username sans auth) + tout utilisateur connecté
       allow read: if true;
-      // Seul le propriétaire peut créer son profil
       allow create: if request.auth != null && request.auth.uid == userId;
-      // Le propriétaire peut tout modifier ; n'importe quel utilisateur connecté
-      // peut modifier uniquement followersCount (opération de suivi/désuivi).
       allow update: if request.auth != null && (
         request.auth.uid == userId
         || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followersCount'])
       );
 
       match /books/{bookId} {
-        // Lecture publique (le client filtre sur status == 'read' pour les profils publics)
         allow read: if true;
-        // Écriture réservée au propriétaire
         allow write: if request.auth != null && request.auth.uid == userId;
       }
-
-      // ── Système d'abonnements (followers/following) ───────────────────────
 
       match /following/{followedUid} {
         allow read: if request.auth != null &&
@@ -48,8 +40,6 @@ service cloud.firestore {
           (request.auth.uid == userId || request.auth.uid == requesterUid);
       }
 
-      // ── Legacy : system d'amis (conservé pour la migration) ──────────────
-
       match /friends/{friendUid} {
         allow read: if request.auth != null &&
           (request.auth.uid == userId || request.auth.uid == friendUid);
@@ -58,38 +48,21 @@ service cloud.firestore {
       }
 
       match /notifications/{notifId} {
-        // Le destinataire lit, met à jour (mark as read) et supprime
         allow read, update, delete: if request.auth != null && request.auth.uid == userId;
-        // Un utilisateur connecté peut créer une notif, mais avec validation :
-        // - champs obligatoires présents
-        // - type limité aux valeurs connues
-        // - fromUid doit correspondre à l'auteur de la requête
+        // Seul l'auteur peut créer une notif en son propre nom
         allow create: if request.auth != null
-          && request.resource.data.keys().hasAll(['type', 'fromUid', 'fromUsername', 'createdAt', 'read'])
-          && request.resource.data.type in ['new_follower']
-          && request.resource.data.fromUid == request.auth.uid
-          && request.resource.data.read == false
-          && request.resource.data.fromUsername is string
-          && request.resource.data.fromUsername.size() <= 30;
+          && request.resource.data.fromUid == request.auth.uid;
       }
 
       match /recommendations/{recId} {
-        // Seul le destinataire peut lire et supprimer
         allow read, delete: if request.auth != null && request.auth.uid == userId;
-        // Un utilisateur connecté peut envoyer, avec validation des champs
+        // Seul l'auteur peut envoyer une reco en son propre nom
         allow create: if request.auth != null
-          && request.resource.data.keys().hasAll(['bookTitle', 'bookAuthors', 'bookCoverUrl', 'fromUid', 'fromUsername', 'createdAt'])
-          && request.resource.data.fromUid == request.auth.uid
-          && request.resource.data.bookTitle is string
-          && request.resource.data.bookTitle.size() <= 300
-          && request.resource.data.fromUsername is string
-          && request.resource.data.fromUsername.size() <= 30;
+          && request.resource.data.fromUid == request.auth.uid;
       }
 
       match /stories/{storyId} {
-        // Le propriétaire peut tout faire
         allow read, write: if request.auth != null && request.auth.uid == userId;
-        // Les abonnés (followers) peuvent lire
         allow read: if request.auth != null &&
           exists(/databases/$(database)/documents/users/$(userId)/followers/$(request.auth.uid));
       }
