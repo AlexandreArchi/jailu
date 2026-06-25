@@ -6,6 +6,7 @@ on:
     paths:
       - 'frontend/**'
       - 'infra/**'
+      - 'firebase.json'
       - '.github/workflows/frontend.yml'
   pull_request:
     branches: [main]
