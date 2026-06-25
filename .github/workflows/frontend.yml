@@ -69,6 +69,4 @@ jobs:
 
       - name: Déploiement Firebase Hosting + Firestore rules
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
-        run: firebase deploy --only hosting,firestore:rules --project ${{ secrets.GCP_PROJECT_ID }} --token $FIREBASE_TOKEN
+        run: firebase deploy --only hosting,firestore:rules --project ${{ secrets.GCP_PROJECT_ID }}
